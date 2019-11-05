@@ -18,7 +18,7 @@ var (
 	openDBs map[string]*kv.DB = make(map[string]*kv.DB)
 )
 
-// GetStore returns a pointer to the store and err = nil.
+// GetStore returns a pointer to the store and err == nil.
 //
 // On error, err != nil.
 //
@@ -26,7 +26,7 @@ var (
 // in the latter case, it will be created)
 //
 // The store is implemented by modernc.org/kv.
-// 
+//
 // You should not close the store
 func GetStore(name string) (db *kv.DB, err error) {
 	var (
@@ -56,4 +56,21 @@ func GetStore(name string) (db *kv.DB, err error) {
 	openDBs[name] = db
 	return db, nil
 
+}
+
+// CloseStore closes a store by name and is preferred over calling the Close() method of
+// kv's wrapped db
+func CloseStore(name string) {
+	if db, isOpen := openDBs[name]; isOpen {
+		db.Close()
+		delete(openDBs, name)
+	}
+}
+
+// ClearStore both calls CloseStore() and erases the associated disk file
+func ClearStore(name string) {
+	if _, isOpen := openDBs[name]; isOpen {
+		CloseStore(name)
+		os.Remove(name)
+	}
 }

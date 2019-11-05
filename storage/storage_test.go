@@ -3,6 +3,7 @@ package storage
 import (
 	"os"
 	"testing"
+
 	"modernc.org/kv"
 )
 
@@ -13,7 +14,7 @@ func TestStorage(t *testing.T) {
 
 	var (
 		err error
-		db *kv.DB
+		db  *kv.DB
 	)
 
 	// try to create
@@ -36,6 +37,5 @@ func TestStorage(t *testing.T) {
 		t.Error(err)
 		return
 	}
-
 
 }
