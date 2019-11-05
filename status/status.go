@@ -6,6 +6,11 @@ import (
 	"modernc.org/kv"
 )
 
+// helper
+func toString(x int64) string {
+	return strconv.FormatInt(x, 10)
+}
+
 // Status holds information the raft node needs to operate.
 // All struct members are non-exported to enforce usage of
 // functions for reading/writing these values
@@ -19,10 +24,7 @@ type Status struct {
 	db *kv.DB
 }
 
-func toString(x int64) string {
-	return strconv.FormatInt(x, 10)
-}
-
+// New constructs a Status struct, automatically recovering state from disk, if any
 func New(nodeID int64, db *kv.DB) *Status {
 
 	var (
@@ -60,7 +62,7 @@ func New(nodeID int64, db *kv.DB) *Status {
 	}
 
 	if votedForSlice == nil {
-		votedFor = 0
+		votedFor = -1
 	} else {
 		votedFor, err = strconv.ParseInt(string(votedForSlice), 10, 64)
 		// TODO: how to handle an error here ?
@@ -70,12 +72,12 @@ func New(nodeID int64, db *kv.DB) *Status {
 	}
 
 	return &Status{
-		nodeID: nodeID,
+		nodeID:      nodeID,
 		currentTerm: currentTerm,
-		votedFor: votedFor,
+		votedFor:    votedFor,
 		commitIndex: -1,
 		lastApplied: -1,
-		db: db
+		db:          db,
 	}
 }
 
@@ -89,6 +91,19 @@ func (status *Status) CurrentTerm() int64 {
 	return status.currentTerm
 }
 
+// SetCurrentTerm automatically persists the change (necessary for correctness)
+func (status *Status) SetCurrentTerm(newTerm int64) {
+	status.currentTerm = newTerm
+	err := status.db.Set(
+		[]byte("/raft/nodeID="+toString(status.nodeID)+"/currentTerm"),
+		[]byte(toString(newTerm)))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+}
+
 // VotedFor is the address (a positive number) of another raft node for which
 // this raft node has voted in this turn.
 //
@@ -97,14 +112,37 @@ func (status *Status) VotedFor() int64 {
 	return status.votedFor
 }
 
+// SetVotedFor automatically persists the change (necessary for correctness)
+func (status *Status) SetVotedFor(newVotedFor int64) {
+	status.votedFor = newVotedFor
+	err := status.db.Set(
+		[]byte("/raft/nodeID="+toString(status.nodeID)+"/votedFor"),
+		[]byte(toString(newVotedFor)))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+}
+
 // CommitIndex is the index of the most up-to-date log entry known to be
 // committed by this raft node
 func (status *Status) CommitIndex() int64 {
 	return status.commitIndex
 }
 
+// SetCommitIndex does not persist the change (not needed for correctness)
+func (status *Status) SetCommitIndex(newCommitIndex int64) {
+	status.commitIndex = newCommitIndex
+}
+
 // LastApplied is the index of the last committed log entry that has already
 // been applied by the raft state machine
 func (status *Status) LastApplied() int64 {
 	return status.lastApplied
+}
+
+// SetLastApplied does not persist the change (not needed for correctness)
+func (status *Status) SetLastApplied(newLastApplied int64) {
+	status.lastApplied = newLastApplied
 }
