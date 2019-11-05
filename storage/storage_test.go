@@ -3,8 +3,6 @@ package storage
 import (
 	"os"
 	"testing"
-
-	"modernc.org/kv"
 )
 
 // TestStorage exercises the GetStore method
@@ -13,29 +11,33 @@ func TestStorage(t *testing.T) {
 	os.Remove("/tmp/raftdb")
 
 	var (
-		err error
-		db  *kv.DB
+		err     error
+		storage *Storage
 	)
 
 	// try to create
-	db, err = GetStore("/tmp/raftdb")
+	storage, err = New("/tmp/raftdb")
+	defer storage.Clear()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
-	// close to remove the lockfiles
-	err = db.Close()
+	// close
+	storage.Close()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
-	// try to open (because already created)
-	_, err = GetStore("/tmp/raftdb")
+	// try to open
+	storage, err = New("/tmp/raftdb")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
+	}
+	defer storage.Close()
+
+	_, err = New("/tmp/raftdb")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 }

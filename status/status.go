@@ -1,9 +1,8 @@
 package status
 
 import (
+	"simpleraft/storage"
 	"strconv"
-
-	"modernc.org/kv"
 )
 
 // helper
@@ -21,11 +20,11 @@ type Status struct {
 	commitIndex int64
 	lastApplied int64
 	// pointer to data storage
-	db *kv.DB
+	storage *storage.Storage
 }
 
 // New constructs a Status struct, automatically recovering state from disk, if any
-func New(nodeID int64, db *kv.DB) *Status {
+func New(nodeID int64, storage *storage.Storage) *Status {
 
 	var (
 		err              error
@@ -36,7 +35,9 @@ func New(nodeID int64, db *kv.DB) *Status {
 	)
 
 	// retrieve currentTerm from datastore
-	currentTermSlice, err = db.Get(nil, []byte("/raft/nodeID="+toString(nodeID)+"/currentTerm"))
+	currentTermSlice, err = storage.Get(
+		nil,
+		[]byte("/raft/nodeID="+toString(nodeID)+"/currentTerm"))
 
 	// TODO: how to handle an error here ?
 	if err != nil {
@@ -54,7 +55,9 @@ func New(nodeID int64, db *kv.DB) *Status {
 	}
 
 	// retrieve votedFor from datastore
-	votedForSlice, err = db.Get(nil, []byte("/raft/nodeID="+toString(nodeID)+"/votedFor"))
+	votedForSlice, err = storage.Get(
+		nil,
+		[]byte("/raft/nodeID="+toString(nodeID)+"/votedFor"))
 
 	// TODO: how to handle an error here ?
 	if err != nil {
@@ -77,7 +80,7 @@ func New(nodeID int64, db *kv.DB) *Status {
 		votedFor:    votedFor,
 		commitIndex: -1,
 		lastApplied: -1,
-		db:          db,
+		storage:     storage,
 	}
 }
 
@@ -94,7 +97,7 @@ func (status *Status) CurrentTerm() int64 {
 // SetCurrentTerm automatically persists the change (necessary for correctness)
 func (status *Status) SetCurrentTerm(newTerm int64) {
 	status.currentTerm = newTerm
-	err := status.db.Set(
+	err := status.storage.Set(
 		[]byte("/raft/nodeID="+toString(status.nodeID)+"/currentTerm"),
 		[]byte(toString(newTerm)))
 
@@ -115,7 +118,7 @@ func (status *Status) VotedFor() int64 {
 // SetVotedFor automatically persists the change (necessary for correctness)
 func (status *Status) SetVotedFor(newVotedFor int64) {
 	status.votedFor = newVotedFor
-	err := status.db.Set(
+	err := status.storage.Set(
 		[]byte("/raft/nodeID="+toString(status.nodeID)+"/votedFor"),
 		[]byte(toString(newVotedFor)))
 

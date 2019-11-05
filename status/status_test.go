@@ -8,14 +8,14 @@ import (
 )
 
 func TestRecoverFromDisk(t *testing.T) {
-	db, err := storage.GetStore("/tmp/raftdb")
-	defer storage.ClearStore("/tmp/raftdb")
+	storage, err := storage.New("/tmp/raftdb")
+	defer storage.Clear() // close and delete information
 
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	status := New(1, db)
+	status := New(1, storage)
 
 	assert.Equal(t, int64(1), status.NodeID())
 	assert.Equal(t, int64(0), status.CurrentTerm())
@@ -34,7 +34,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(12), status.CommitIndex())
 	assert.Equal(t, int64(9), status.LastApplied())
 
-	status = New(1, db)
+	status = New(1, storage)
 
 	assert.Equal(t, int64(1), status.NodeID())
 	assert.Equal(t, int64(10), status.CurrentTerm())

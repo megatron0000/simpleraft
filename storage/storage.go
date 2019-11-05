@@ -6,6 +6,7 @@ import (
 	"modernc.org/kv"
 )
 
+// helper
 func exists(name string) (bool, error) {
 	_, err := os.Stat(name)
 	if os.IsNotExist(err) {
@@ -14,28 +15,32 @@ func exists(name string) (bool, error) {
 	return err == nil, err
 }
 
+// Storage represented a key-value store backed by a disk file
+type Storage struct {
+	db   *kv.DB
+	name string
+}
+
 var (
-	openDBs map[string]*kv.DB = make(map[string]*kv.DB)
+	// stores open Storage instances (map from name to Storage)
+	openDBs map[string]*Storage = make(map[string]*Storage)
 )
 
-// GetStore returns a pointer to the store and err == nil.
+// New returns a pointer to the store and err == nil.
 //
 // On error, err != nil.
 //
-// GetStore can be called whether the store already exists or not (
+// New can be called whether the named store already exists or not (
 // in the latter case, it will be created)
-//
-// The store is implemented by modernc.org/kv.
-//
-// You should not close the store
-func GetStore(name string) (db *kv.DB, err error) {
+func New(name string) (storage *Storage, err error) {
 	var (
 		exist  bool
 		isOpen bool
+		db     *kv.DB
 	)
 
-	if db, isOpen = openDBs[name]; isOpen {
-		return db, nil
+	if storage, isOpen = openDBs[name]; isOpen {
+		return storage, nil
 	}
 
 	exist, err = exists(name)
@@ -53,24 +58,43 @@ func GetStore(name string) (db *kv.DB, err error) {
 		return nil, err
 	}
 
-	openDBs[name] = db
-	return db, nil
+	storage = &Storage{name: name, db: db}
+
+	openDBs[name] = storage
+	return storage, nil
 
 }
 
-// CloseStore closes a store by name and is preferred over calling the Close() method of
-// kv's wrapped db
-func CloseStore(name string) {
-	if db, isOpen := openDBs[name]; isOpen {
-		db.Close()
-		delete(openDBs, name)
+// Close closes a store. It is idempotent
+func (storage *Storage) Close() {
+	storage.db.Close()
+	if _, isOpen := openDBs[storage.name]; isOpen {
+		delete(openDBs, storage.name)
 	}
 }
 
-// ClearStore both calls CloseStore() and erases the associated disk file
-func ClearStore(name string) {
-	if _, isOpen := openDBs[name]; isOpen {
-		CloseStore(name)
-		os.Remove(name)
+// Clear both calls Close() and erases the disk file associated to the storage.
+func (storage *Storage) Clear() {
+	if _, isOpen := openDBs[storage.name]; isOpen {
+		storage.Close()
+		os.Remove(storage.name)
 	}
+}
+
+// Get returns the value associated with key, or nil if no such value exists.
+// The returned slice may be a sub-slice of buf if buf was large enough to hold
+// the entire content. Otherwise, a newly allocated slice will be returned. It
+// is valid to pass a nil buf.
+//
+// Get is atomic and it is safe for concurrent use by multiple goroutines.
+func (storage *Storage) Get(buf, key []byte) ([]byte, error) {
+	return storage.db.Get(buf, key)
+}
+
+// Set sets the value associated with key. 
+// Any previous value, if existed, is overwritten by the new one.
+//
+// Set is atomic and it is safe for concurrent use by multiple goroutines.
+func (storage *Storage) Set(key, value []byte) error {
+	return storage.db.Set(key, value)
 }
