@@ -2,7 +2,7 @@
     |                                            |                           |                                     |
     |               RuleHandler                  |                           |       State Machine                 |
     |                                            |     (2) respond           |                                     |
-    |     Given a message, calculates the        |     with action           | Application+specific state machine. |
+    |     Given a message, calculates the        |     with action           | Application_specific state machine. |
     |     appropriate response and               |                           | Example: For a key=> value store,   |
     |     returns it.                            |  +----+                   | this component would implement the  |
     |     Has no knowledge of implementation_    |       |                   | store. Raft commands passed to here |

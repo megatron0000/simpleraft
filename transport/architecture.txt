@@ -1,0 +1,16 @@
+                        listening on a port
+   +
+   |                           +--------------------+                             +----------------+
+   |                      xxxx |                    |                             |                |
+   |                         x | Transport service  |     +-------------->        |                |
+   |     +---------------->  x |                    |                             |   Application  |
+   |                         x |                    |   2:  publish request to    |                |
+   |        1:  Request  xxxxx |                    |       "receiver" channel    |                |
+   |                           |                    |                             +----------------+
+   |                           +--------------------+
+   |
+   |
+   |     <------------------+                             <--------------+
+   |
+  ++        4: Respond                                 3:   write response to
+Internet                                                    "reply" channel
