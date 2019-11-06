@@ -24,4 +24,4 @@
                v                    |
  (ASCII string as a []byte) <-------+
 
-example: "/raft/nodeID=1/currentTerm" +-> "123"
+example: "/raft/nodeID=1/currentTerm" => "123"

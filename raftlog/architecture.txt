@@ -1,0 +1,3 @@
+Index x stored at /raft/nodeID=1234/index=x
+
+lastIndex stored at /raft/nodeID=1234/lastIndex

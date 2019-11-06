@@ -3,9 +3,9 @@
     |               RuleHandler                  |                           |       State Machine                 |
     |                                            |     (2) respond           |                                     |
     |     Given a message, calculates the        |     with action           | Application+specific state machine. |
-    |     appropriate response and               |                           | Example: For a key-> value store,   |
+    |     appropriate response and               |                           | Example: For a key=> value store,   |
     |     returns it.                            |  +----+                   | this component would implement the  |
-    |     Has no knowledge of implementation+    |       |                   | store. Raft commands passed to here |
+    |     Has no knowledge of implementation_    |       |                   | store. Raft commands passed to here |
     |     specific components                    |       |                   | would be Get()s and Put()s          |
     |                                            |       |                   |                                     |
     +-------------------+------------------------+       |                   +---------------------------+---------+
@@ -27,7 +27,7 @@
 +---------------------------------------+   |       TransportService               |  +---------------------------------------+
 |         StatusController              |   |                                      |  |         LogController                 |
 |                                       |   |                                      |  |                                       |
-|  Stores state-specific information:   |   |   Implements message passing between |  |   Appends (or changes) entries        |
+|  Stores state_specific information:   |   |   Implements message passing between |  |   Appends (or changes) entries        |
 |  currentTerm, votedFor, commitIndex,  |   |   Raft nodes or between a client and |  |   to the log, saves the log to disk,  |
 |  lastApplied                          |   |   a Raft node                        |  |   and reads the log.                  |
 +---------------------------------------+   +--------------------------------------+  +--------+------------------------------+
@@ -40,6 +40,6 @@
                        |                       |                           |                   |
                        +------------------->   |                           | <-----------------+
                                                |  Implements the           |
-                      use                      |  save-to-disk mechanism   |          use
+                      use                      |  save_to_disk mechanism   |          use
                                                |                           |
                                                +---------------------------+
