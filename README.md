@@ -18,3 +18,7 @@ We recommend Visual Studio Code editor with Go extension by Microsoft (extension
 # Architecture
 
 See `achitecture.txt`. Diagram made with asciiflow.
+
+# Testing
+
+Run `bash testall.sh`. Maybe only works on Linux, since we make use of "/tmp/..."-style paths
