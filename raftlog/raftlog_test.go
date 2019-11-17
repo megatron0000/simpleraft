@@ -22,7 +22,7 @@ func TestLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	log, err = New(store, 0x1)
+	log, err = New(store)
 
 	if err != nil {
 		t.Fatal(err)
@@ -39,7 +39,7 @@ func TestLog(t *testing.T) {
 	assert.Equal(t, int64(1), log.LastIndex())
 
 	// make sure it was saved
-	log, err = New(store, 0x1)
+	log, err = New(store)
 
 	if err != nil {
 		t.Fatal(err)

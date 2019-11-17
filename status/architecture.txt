@@ -1,8 +1,8 @@
            +----------------------------------+
            |                                  |       datastore key convention:
            |              Status              |
-           |                                  |       /raft/nodeID=1234/currentTerm
-           |                                  |       /raft/nodeID=1234/votedFor
+           |                                  |       /raft/currentTerm
+           |                                  |       /raft/votedFor
            |                                  |
            |                +                 |
            |                |                 |
@@ -24,4 +24,4 @@
                v                    |
  (ASCII string as a []byte) <-------+
 
-example: "/raft/nodeID=1/currentTerm" => "123"
+example: "/raft/currentTerm" => "123"

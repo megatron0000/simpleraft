@@ -16,7 +16,6 @@ func toString(x int64) string {
 // A particular instance of the struct represents the log of 1
 // raft node
 type RaftLog struct {
-	nodeID    int64
 	lastIndex int64
 	storage   *storage.Storage
 }
@@ -31,7 +30,7 @@ type LogEntry struct {
 }
 
 // New creates a RaftLog instance
-func New(storage *storage.Storage, nodeID int64) (log *RaftLog, err error) {
+func New(storage *storage.Storage) (log *RaftLog, err error) {
 	var (
 		lastIndexMarshal []byte
 		lastIndex        int64
@@ -39,7 +38,7 @@ func New(storage *storage.Storage, nodeID int64) (log *RaftLog, err error) {
 
 	lastIndexMarshal, err = storage.Get(
 		nil,
-		[]byte("/raft/nodeID="+toString(nodeID)+"/log/lastIndex"))
+		[]byte("/raft/log/lastIndex"))
 
 	if err != nil {
 		return nil, err
@@ -55,7 +54,7 @@ func New(storage *storage.Storage, nodeID int64) (log *RaftLog, err error) {
 		return nil, err
 	}
 
-	return &RaftLog{storage: storage, nodeID: nodeID, lastIndex: lastIndex}, nil
+	return &RaftLog{storage: storage, lastIndex: lastIndex}, nil
 }
 
 // Set writes a log entry to disk (if one exists at `index`, it will be overwritten)
@@ -72,7 +71,7 @@ func (log *RaftLog) Set(index int64, entry LogEntry) (err error) {
 	}
 
 	err = log.storage.Set(
-		[]byte("/raft/nodeID="+toString(log.nodeID)+"/log/index="+toString(index)),
+		[]byte("/raft/log/index="+toString(index)),
 		marshal)
 
 	if err != nil {
@@ -81,7 +80,7 @@ func (log *RaftLog) Set(index int64, entry LogEntry) (err error) {
 
 	if index > log.lastIndex {
 		log.lastIndex = index
-		err = log.storage.Set([]byte("/raft/nodeID="+toString(log.nodeID)+"/log/lastIndex"),
+		err = log.storage.Set([]byte("/raft/log/lastIndex"),
 			[]byte(toString(log.lastIndex)))
 	}
 
@@ -104,7 +103,7 @@ func (log *RaftLog) Get(index int64) (logEntry *LogEntry, err error) {
 
 	marshal, err = log.storage.Get(
 		nil,
-		[]byte("/raft/nodeID="+toString(log.nodeID)+"/log/index="+toString(index)))
+		[]byte("/raft/log/index="+toString(index)))
 
 	if err != nil {
 		return nil, err
