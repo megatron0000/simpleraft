@@ -12,6 +12,8 @@ func TestLog(t *testing.T) {
 		store *storage.Storage
 		log   *RaftLog
 		entry *LogEntry
+		command map[string]float64
+		commandContent interface{}
 		err   error
 	)
 
@@ -30,7 +32,11 @@ func TestLog(t *testing.T) {
 
 	assert.Equal(t, int64(-1), log.LastIndex())
 
-	err = log.Set(1, LogEntry{Term: 2, Command: nil})
+	command = make(map[string]float64)
+	command["a"] = 1
+	command["b"] = 2
+
+	err = log.Set(1, LogEntry{Term: 2, Command: command})
 
 	if err != nil {
 		t.Fatal(err)
@@ -54,5 +60,11 @@ func TestLog(t *testing.T) {
 	}
 
 	assert.Equal(t, int64(2), entry.Term)
+	
+	commandContent = entry.Command.(map[string]interface{})["a"]
+	assert.Equal(t, float64(1), commandContent.(float64))
+	
+	commandContent = entry.Command.(map[string]interface{})["b"]
+	assert.Equal(t, float64(2), commandContent.(float64))
 
 }

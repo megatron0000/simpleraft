@@ -21,12 +21,12 @@ type RaftLog struct {
 }
 
 // LogEntry represents an entry in the log.
-// `command` is a byte buffer because there is no a-priori structure
+// `command` is an interface{} because there is no a-priori structure
 // to be imposed (on the contrary: each application on top of raft has
 // its intended semantics for the command)
 type LogEntry struct {
 	Term    int64
-	Command []byte
+	Command interface{}
 }
 
 // New creates a RaftLog instance
