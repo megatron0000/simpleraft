@@ -10,12 +10,10 @@ import (
 
 func TestLog(t *testing.T) {
 	var (
-		store          *storage.Storage
-		log            *RaftLog
-		entry          *iface.LogEntry
-		command        map[string]float64
-		commandContent interface{}
-		err            error
+		store *storage.Storage
+		log   *RaftLog
+		entry *iface.LogEntry
+		err   error
 	)
 
 	store, err = storage.New("/tmp/raftdb")
@@ -33,11 +31,19 @@ func TestLog(t *testing.T) {
 
 	assert.Equal(t, int64(-1), log.LastIndex())
 
-	command = make(map[string]float64)
-	command["a"] = 1
-	command["b"] = 2
+	err = log.Append(iface.LogEntry{
+		Term:    2,
+		Command: []byte("command"),
+		Kind:    iface.EntryStateMachineCommand})
 
-	err = log.Set(1, iface.LogEntry{Term: 2, Command: command})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = log.Append(iface.LogEntry{
+		Term:    3,
+		Command: []byte("other command"),
+		Kind:    iface.EntryStateMachineCommand})
 
 	if err != nil {
 		t.Fatal(err)
@@ -60,12 +66,26 @@ func TestLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assert.Equal(t, int64(3), entry.Term)
+	assert.Equal(t, []byte("other command"), entry.Command)
+	assert.Equal(t, iface.EntryStateMachineCommand, entry.Kind)
+
+	err = log.Remove()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, int64(0), log.LastIndex())
+
+	entry, err = log.Get(0)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Equal(t, int64(2), entry.Term)
-
-	commandContent = entry.Command.(map[string]interface{})["a"]
-	assert.Equal(t, float64(1), commandContent.(float64))
-
-	commandContent = entry.Command.(map[string]interface{})["b"]
-	assert.Equal(t, float64(2), commandContent.(float64))
+	assert.Equal(t, []byte("command"), entry.Command)
+	assert.Equal(t, iface.EntryStateMachineCommand, entry.Kind)
 
 }

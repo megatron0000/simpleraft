@@ -3,6 +3,9 @@ Index x stored at /raft/index=x
 lastIndex stored at /raft/lastIndex
 
 The raft log does not care what are the "commands" stored inside the log.
-It cares only about "index" and "term" of the entries. The "command" is an
+It cares only about "index", "term" and "type" of the entries. The "command" is an
 opaque byte-slice, and it is responsibility of upper-level components to
 give meaning to this byte-slice.
+
+The raft log has a stack-like API: Append() appends to lasIndex + 1, and Remove() deletes
+the entry at greatest index

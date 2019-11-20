@@ -49,8 +49,16 @@ func New(storage *storage.Storage) (log *RaftLog, err error) {
 	return &RaftLog{storage: storage, lastIndex: lastIndex}, nil
 }
 
-// Set writes a log entry to disk (if one exists at `index`, it will be overwritten)
-func (log *RaftLog) Set(index int64, entry iface.LogEntry) (err error) {
+// Append writes a log entry to the end of the log
+func (log *RaftLog) Append(entry iface.LogEntry) (err error) {
+	switch entry.Kind {
+	case iface.EntryStateMachineCommand:
+	case iface.EntryAddServer:
+	case iface.EntryRemoveServer:
+	case iface.EntryNoOp:
+	default:
+		panic("unknown log entry kind: " + entry.Kind)
+	}
 
 	var (
 		marshal []byte
@@ -62,23 +70,69 @@ func (log *RaftLog) Set(index int64, entry iface.LogEntry) (err error) {
 		return err
 	}
 
+	if err = log.storage.BeginTransaction(); err != nil {
+		return err
+	}
+
+	defer func() {
+		switch err {
+		case nil:
+			log.storage.Commit()
+		default:
+			log.storage.Rollback()
+		}
+	}()
+
 	err = log.storage.Set(
-		[]byte("/raft/log/index="+toString(index)),
+		[]byte("/raft/log/index="+toString(log.lastIndex+1)),
 		marshal)
 
 	if err != nil {
 		return err
 	}
 
-	if index > log.lastIndex {
-		log.lastIndex = index
-		err = log.storage.Set([]byte("/raft/log/lastIndex"),
-			[]byte(toString(log.lastIndex)))
-	}
+	log.lastIndex++
+
+	err = log.storage.Set([]byte("/raft/log/lastIndex"),
+		[]byte(toString(log.lastIndex)))
 
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// Remove deletes the log entry with greatest index (i.e. removes from the end)
+func (log *RaftLog) Remove() (err error) {
+
+	if log.lastIndex == -1 {
+		panic("raft log: called Remove() on an empty log")
+	}
+
+	if err = log.storage.BeginTransaction(); err != nil {
+		return err
+	}
+	defer func() {
+		switch err {
+		case nil:
+			log.storage.Commit()
+		default:
+			log.storage.Rollback()
+		}
+	}()
+
+	if err = log.storage.Delete(
+		[]byte("/raft/log/index=" + toString(log.lastIndex))); err != nil {
+		return err
+	}
+
+	if err = log.storage.Set([]byte("/raft/log/lastIndex"),
+		[]byte(toString(log.lastIndex-1))); err != nil {
+		return err
+	}
+
+	log.lastIndex--
 
 	return nil
 }
