@@ -91,10 +91,41 @@ func (storage *Storage) Get(buf, key []byte) ([]byte, error) {
 	return storage.db.Get(buf, key)
 }
 
-// Set sets the value associated with key. 
+// Set sets the value associated with key.
 // Any previous value, if existed, is overwritten by the new one.
 //
 // Set is atomic and it is safe for concurrent use by multiple goroutines.
 func (storage *Storage) Set(key, value []byte) error {
 	return storage.db.Set(key, value)
+}
+
+// BeginTransaction starts a new transaction. Every call to BeginTransaction must
+// be eventually "balanced" by exactly one call to Commit or Rollback (but not both).
+// Calls to BeginTransaction may nest.
+//
+// BeginTransaction is atomic and it is safe for concurrent use by multiple goroutines
+// (if/when that makes sense).
+func (storage *Storage) BeginTransaction() error {
+	return storage.db.BeginTransaction()
+}
+
+// Commit commits the current transaction. If the transaction is the
+// top level one, then all of the changes made within the transaction
+// are atomically made persistent in the DB. Invocation of an unbalanced Commit is an error.
+//
+// Commit is atomic and it is safe for concurrent use by multiple goroutines
+// (if/when that makes sense).
+func (storage *Storage) Commit() error {
+	return storage.db.Commit()
+}
+
+// Rollback cancels and undoes the innermost transaction level. If the
+// transaction is the top level one, then no of the changes made within the
+// transactions are persisted. Invocation of an unbalanced Rollback is an
+// error.
+//
+// Rollback is atomic and it is safe for concurrent use by multiple goroutines
+// (if/when that makes sense).
+func (storage *Storage) Rollback() error {
+	return storage.db.Rollback()
 }

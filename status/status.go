@@ -25,6 +25,12 @@ type Status struct {
 	peerAddresses []PeerAddress
 	nextIndex     map[PeerAddress]int64
 	matchIndex    map[PeerAddress]int64
+	// The latest UNCOMITTED log index corresponding to a cluster-change command
+	// -1 if none
+	clusterChangeIndex int64
+	// The term of log entry whose index is `clusterChangeIndex`
+	// -1 if none
+	clusterChangeTerm int64
 	// pointer to data storage
 	storage *storage.Storage
 }
@@ -34,13 +40,17 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 	storage *storage.Storage) *Status {
 
 	var (
-		err              error
-		currentTermSlice []byte
-		currentTerm      int64
-		votedForSlice    []byte
-		votedFor         PeerAddress
-		nextIndex        map[PeerAddress]int64
-		matchIndex       map[PeerAddress]int64
+		err                     error
+		currentTermSlice        []byte
+		currentTerm             int64
+		votedForSlice           []byte
+		votedFor                PeerAddress
+		nextIndex               map[PeerAddress]int64
+		matchIndex              map[PeerAddress]int64
+		clusterChangeIndexSlice []byte
+		clusterChangeIndex      int64
+		clusterChangeTermSlice  []byte
+		clusterChangeTerm       int64
 	)
 
 	// retrieve currentTerm from datastore
@@ -87,16 +97,58 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 		matchIndex[address] = -1
 	}
 
+	// retrieve clusterChangeIndex from datastore
+	clusterChangeIndexSlice, err = storage.Get(
+		nil,
+		[]byte("/raft/clusterChangeIndex"))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+
+	if clusterChangeIndexSlice == nil {
+		clusterChangeIndex = -1
+	} else {
+		clusterChangeIndex, err = strconv.ParseInt(string(clusterChangeIndexSlice), 10, 64)
+		// TODO: how to handle an error here ?
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// retrieve clusterChangeTerm from datastore
+	clusterChangeTermSlice, err = storage.Get(
+		nil,
+		[]byte("/raft/clusterChangeTerm"))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+
+	if clusterChangeTermSlice == nil {
+		clusterChangeTerm = -1
+	} else {
+		clusterChangeTerm, err = strconv.ParseInt(string(clusterChangeTermSlice), 10, 64)
+		// TODO: how to handle an error here ?
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	return &Status{
-		nodeAddress:   nodeAddress,
-		currentTerm:   currentTerm,
-		votedFor:      votedFor,
-		commitIndex:   -1,
-		lastApplied:   -1,
-		peerAddresses: peerAddresses,
-		nextIndex:     nextIndex,
-		matchIndex:    matchIndex,
-		storage:       storage,
+		nodeAddress:        nodeAddress,
+		currentTerm:        currentTerm,
+		votedFor:           votedFor,
+		commitIndex:        -1,
+		lastApplied:        -1,
+		peerAddresses:      peerAddresses,
+		nextIndex:          nextIndex,
+		matchIndex:         matchIndex,
+		clusterChangeIndex: clusterChangeIndex,
+		clusterChangeTerm:  clusterChangeTerm,
+		storage:            storage,
 	}
 }
 
@@ -191,4 +243,48 @@ func (status *Status) MatchIndex(peer PeerAddress) int64 {
 // SetMatchIndex does not persist the change (not needed for correctness)
 func (status *Status) SetMatchIndex(peer PeerAddress, matchIndex int64) {
 	status.matchIndex[peer] = matchIndex
+}
+
+// ClusterChangeIndex is the latest UNCOMITTED log index
+// corresponding to a cluster-change command. -1 if none
+func (status *Status) ClusterChangeIndex() int64 {
+	return status.clusterChangeIndex
+}
+
+// ClusterChangeTerm is the term of log entry whose
+// index is `clusterChangeIndex`. -1 if none
+func (status *Status) ClusterChangeTerm() int64 {
+	return status.clusterChangeTerm
+}
+
+// SetClusterChange automatically persists the change (necessary for correctness)
+func (status *Status) SetClusterChange(newClusterChangeIndex, newClusterChangeTerm int64) {
+
+	var (
+		err error
+	)
+
+	status.storage.BeginTransaction()
+
+	status.clusterChangeIndex = newClusterChangeIndex
+	err = status.storage.Set(
+		[]byte("/raft/clusterChangeIndex"),
+		[]byte(toString(newClusterChangeIndex)))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+
+	status.clusterChangeTerm = newClusterChangeTerm
+	err = status.storage.Set(
+		[]byte("/raft/clusterChangeTerm"),
+		[]byte(toString(newClusterChangeTerm)))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+
+	status.storage.Commit()
 }

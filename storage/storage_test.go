@@ -1,43 +1,73 @@
 package storage
 
 import (
-	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestStorage exercises the GetStore method
 func TestStorage(t *testing.T) {
-	// delete db
-	os.Remove("/tmp/raftdb")
-
 	var (
 		err     error
 		storage *Storage
+		data    []byte
 	)
 
 	// try to create
-	storage, err = New("/tmp/raftdb")
-	defer storage.Clear()
-	if err != nil {
+	if storage, err = New("/tmp/raftdb"); err != nil {
 		t.Fatal(err)
 	}
+
+	defer storage.Clear()
 
 	// close
 	storage.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// try to open
-	storage, err = New("/tmp/raftdb")
-	if err != nil {
+	if storage, err = New("/tmp/raftdb"); err != nil {
 		t.Fatal(err)
 	}
+
 	defer storage.Close()
 
-	_, err = New("/tmp/raftdb")
-	if err != nil {
+	if _, err = New("/tmp/raftdb"); err != nil {
 		t.Fatal(err)
 	}
+
+	// test retrieval
+	if err = storage.Set([]byte("somekey"), []byte{1, 2, 3}); err != nil {
+		t.Fatal(err)
+	}
+
+	if data, err = storage.Get(nil, []byte("somekey")); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, []byte{1, 2, 3}, data)
+
+	if err = storage.BeginTransaction(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = storage.Set([]byte("somekey"), []byte("before rollback")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = storage.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+
+	storage.Close()
+	if storage, err = New("/tmp/raftdb"); err != nil {
+		t.Fatal(err)
+	}
+	defer storage.Clear()
+
+	if data, err = storage.Get(nil, []byte("somekey")); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, []byte{1, 2, 3}, data)
 
 }
