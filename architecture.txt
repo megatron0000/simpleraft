@@ -43,3 +43,8 @@
                       use                      |  save_to_disk mechanism   |          use
                                                |                           |
                                                +---------------------------+
+
+
+
+In general, some high-level interfaces are defined in `ifaces.go` and other subpackages 
+implement them

@@ -1,6 +1,7 @@
 package status
 
 import (
+	"simpleraft/iface"
 	"simpleraft/storage"
 	"testing"
 
@@ -15,15 +16,15 @@ func TestRecoverFromDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	nodeAddress := PeerAddress("localhost:10000")
-	peerAddresses := []PeerAddress{"localhost:10001"}
-	newPeerAddresses := []PeerAddress{"localhost:10001", "localhost:10002"}
+	nodeAddress := iface.PeerAddress("localhost:10000")
+	peerAddresses := []iface.PeerAddress{"localhost:10001"}
+	newPeerAddresses := []iface.PeerAddress{"localhost:10001", "localhost:10002"}
 
 	status := New(nodeAddress, peerAddresses, storage)
 
 	assert.Equal(t, nodeAddress, status.NodeAddress())
 	assert.Equal(t, int64(0), status.CurrentTerm())
-	assert.Equal(t, PeerAddress(""), status.VotedFor())
+	assert.Equal(t, iface.PeerAddress(""), status.VotedFor())
 	assert.Equal(t, peerAddresses, status.PeerAddresses())
 	assert.Equal(t, int64(-1), status.CommitIndex())
 	assert.Equal(t, int64(-1), status.LastApplied())
@@ -32,7 +33,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(0), status.NextIndex(peerAddresses[0]))
 	assert.Equal(t, int64(-1), status.MatchIndex(peerAddresses[0]))
 
-	status.SetNodeAddress(PeerAddress("localhost:10"))
+	status.SetNodeAddress(iface.PeerAddress("localhost:10"))
 	status.SetCurrentTerm(10)
 	status.SetVotedFor(peerAddresses[0])
 	status.SetCommitIndex(12)
@@ -42,7 +43,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	status.SetMatchIndex(peerAddresses[0], 9)
 	status.SetPeerAddresses(newPeerAddresses)
 
-	assert.Equal(t, PeerAddress("localhost:10"), status.NodeAddress())
+	assert.Equal(t, iface.PeerAddress("localhost:10"), status.NodeAddress())
 	assert.Equal(t, int64(10), status.CurrentTerm())
 	assert.Equal(t, peerAddresses[0], status.VotedFor())
 	assert.Equal(t, int64(12), status.CommitIndex())
@@ -56,7 +57,7 @@ func TestRecoverFromDisk(t *testing.T) {
 
 	status = New(nodeAddress, peerAddresses, storage)
 
-	assert.Equal(t, PeerAddress("localhost:10"), status.NodeAddress())
+	assert.Equal(t, iface.PeerAddress("localhost:10"), status.NodeAddress())
 	assert.Equal(t, int64(10), status.CurrentTerm())
 	assert.Equal(t, peerAddresses[0], status.VotedFor())
 	assert.Equal(t, int64(-1), status.CommitIndex())

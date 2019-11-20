@@ -2,6 +2,7 @@ package status
 
 import (
 	"encoding/json"
+	"simpleraft/iface"
 	"simpleraft/storage"
 	"strconv"
 )
@@ -11,21 +12,18 @@ func toString(x int64) string {
 	return strconv.FormatInt(x, 10)
 }
 
-// PeerAddress is the network-address where a peer can be contacted
-type PeerAddress string
-
 // Status holds information the raft node needs to operate.
 // All struct members are non-exported to enforce usage of
 // functions for reading/writing these values
 type Status struct {
-	nodeAddress   PeerAddress
+	nodeAddress   iface.PeerAddress
 	currentTerm   int64
-	votedFor      PeerAddress
+	votedFor      iface.PeerAddress
 	commitIndex   int64
 	lastApplied   int64
-	peerAddresses []PeerAddress
-	nextIndex     map[PeerAddress]int64
-	matchIndex    map[PeerAddress]int64
+	peerAddresses []iface.PeerAddress
+	nextIndex     map[iface.PeerAddress]int64
+	matchIndex    map[iface.PeerAddress]int64
 	// The latest UNCOMITTED log index corresponding to a cluster-change command
 	// -1 if none
 	clusterChangeIndex int64
@@ -39,7 +37,7 @@ type Status struct {
 // New constructs a Status struct, automatically recovering state from disk, if any.
 // `peerAddresses` and `nodeAddress` work as default values: they will only be used
 // if there is no alternative record present in the disk storage
-func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
+func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
 	storage *storage.Storage) *Status {
 
 	var (
@@ -48,9 +46,9 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 		currentTermSlice        []byte
 		currentTerm             int64
 		votedForSlice           []byte
-		votedFor                PeerAddress
-		nextIndex               map[PeerAddress]int64
-		matchIndex              map[PeerAddress]int64
+		votedFor                iface.PeerAddress
+		nextIndex               map[iface.PeerAddress]int64
+		matchIndex              map[iface.PeerAddress]int64
 		clusterChangeIndexSlice []byte
 		clusterChangeIndex      int64
 		clusterChangeTermSlice  []byte
@@ -110,7 +108,7 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 	if votedForSlice == nil {
 		votedFor = ""
 	} else {
-		votedFor = PeerAddress(string(votedForSlice))
+		votedFor = iface.PeerAddress(string(votedForSlice))
 	}
 
 	// retrieve peerAddresses from datastore (if any)
@@ -139,8 +137,8 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 		}
 	}
 
-	nextIndex = make(map[PeerAddress]int64)
-	matchIndex = make(map[PeerAddress]int64)
+	nextIndex = make(map[iface.PeerAddress]int64)
+	matchIndex = make(map[iface.PeerAddress]int64)
 
 	for _, address := range peerAddresses {
 		nextIndex[address] = 0
@@ -203,12 +201,12 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 }
 
 // NodeAddress returns the network address which can be used to contact this node
-func (status *Status) NodeAddress() PeerAddress {
+func (status *Status) NodeAddress() iface.PeerAddress {
 	return status.nodeAddress
 }
 
 // SetNodeAddress automatically persists the change (necessary for correctness)
-func (status *Status) SetNodeAddress(newAddress PeerAddress) {
+func (status *Status) SetNodeAddress(newAddress iface.PeerAddress) {
 	var (
 		marshal []byte
 		err     error
@@ -247,12 +245,12 @@ func (status *Status) SetCurrentTerm(newTerm int64) {
 // this raft node has voted in this turn.
 //
 // If this node has not voted yet, it should be set to the empty string (i.e. "")
-func (status *Status) VotedFor() PeerAddress {
+func (status *Status) VotedFor() iface.PeerAddress {
 	return status.votedFor
 }
 
 // SetVotedFor automatically persists the change (necessary for correctness)
-func (status *Status) SetVotedFor(newVotedFor PeerAddress) {
+func (status *Status) SetVotedFor(newVotedFor iface.PeerAddress) {
 	status.votedFor = newVotedFor
 	err := status.storage.Set(
 		[]byte("/raft/votedFor"),
@@ -287,18 +285,18 @@ func (status *Status) SetLastApplied(newLastApplied int64) {
 }
 
 // PeerAddresses is the slice of peer addresses (does not include the node itself)
-func (status *Status) PeerAddresses() []PeerAddress {
+func (status *Status) PeerAddresses() []iface.PeerAddress {
 	return status.peerAddresses
 }
 
 // SetPeerAddresses automatically persists the change (necessary for correctness)
-func (status *Status) SetPeerAddresses(newPeers []PeerAddress) {
+func (status *Status) SetPeerAddresses(newPeers []iface.PeerAddress) {
 	var (
 		marshal       []byte
 		err           error
-		newNextIndex  map[PeerAddress]int64
-		newMatchIndex map[PeerAddress]int64
-		addr          PeerAddress
+		newNextIndex  map[iface.PeerAddress]int64
+		newMatchIndex map[iface.PeerAddress]int64
+		addr          iface.PeerAddress
 		nextIndex     int64
 		matchIndex    int64
 		ok            bool
@@ -309,8 +307,8 @@ func (status *Status) SetPeerAddresses(newPeers []PeerAddress) {
 	}
 	status.storage.Set([]byte("/raft/peerAddresses"), marshal)
 
-	newNextIndex = make(map[PeerAddress]int64)
-	newMatchIndex = make(map[PeerAddress]int64)
+	newNextIndex = make(map[iface.PeerAddress]int64)
+	newMatchIndex = make(map[iface.PeerAddress]int64)
 
 	// rebuild nextIndex and matchIndex maps
 	for _, addr = range newPeers {
@@ -334,23 +332,23 @@ func (status *Status) SetPeerAddresses(newPeers []PeerAddress) {
 
 // NextIndex is the (as known by leader) next log index a peer is waiting for
 // (0 in the beginning)
-func (status *Status) NextIndex(peer PeerAddress) int64 {
+func (status *Status) NextIndex(peer iface.PeerAddress) int64 {
 	return status.nextIndex[peer]
 }
 
 // SetNextIndex does not persist the change (not needed for correctness)
-func (status *Status) SetNextIndex(peer PeerAddress, nextIndex int64) {
+func (status *Status) SetNextIndex(peer iface.PeerAddress, nextIndex int64) {
 	status.nextIndex[peer] = nextIndex
 }
 
 // MatchIndex is the (as known by leader) last log index where the leader's log
 // matches the peer's log (-1 in the beginning)
-func (status *Status) MatchIndex(peer PeerAddress) int64 {
+func (status *Status) MatchIndex(peer iface.PeerAddress) int64 {
 	return status.matchIndex[peer]
 }
 
 // SetMatchIndex does not persist the change (not needed for correctness)
-func (status *Status) SetMatchIndex(peer PeerAddress, matchIndex int64) {
+func (status *Status) SetMatchIndex(peer iface.PeerAddress, matchIndex int64) {
 	status.matchIndex[peer] = matchIndex
 }
 

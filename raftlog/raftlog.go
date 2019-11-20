@@ -2,6 +2,7 @@ package raftlog
 
 import (
 	"encoding/json"
+	"simpleraft/iface"
 	"simpleraft/storage"
 	"strconv"
 )
@@ -18,15 +19,6 @@ func toString(x int64) string {
 type RaftLog struct {
 	lastIndex int64
 	storage   *storage.Storage
-}
-
-// LogEntry represents an entry in the log.
-// `command` is an interface{} because there is no a-priori structure
-// to be imposed (on the contrary: each application on top of raft has
-// its intended semantics for the command)
-type LogEntry struct {
-	Term    int64
-	Command interface{}
 }
 
 // New creates a RaftLog instance
@@ -58,7 +50,7 @@ func New(storage *storage.Storage) (log *RaftLog, err error) {
 }
 
 // Set writes a log entry to disk (if one exists at `index`, it will be overwritten)
-func (log *RaftLog) Set(index int64, entry LogEntry) (err error) {
+func (log *RaftLog) Set(index int64, entry iface.LogEntry) (err error) {
 
 	var (
 		marshal []byte
@@ -94,12 +86,12 @@ func (log *RaftLog) Set(index int64, entry LogEntry) (err error) {
 // Get reads a log entry, returning a pointer to it.
 //
 // If no entry exists at `index`, returns `logEntry == nil`.
-func (log *RaftLog) Get(index int64) (logEntry *LogEntry, err error) {
+func (log *RaftLog) Get(index int64) (logEntry *iface.LogEntry, err error) {
 	var (
 		marshal []byte
 	)
 
-	logEntry = &LogEntry{}
+	logEntry = &iface.LogEntry{}
 
 	marshal, err = log.storage.Get(
 		nil,
