@@ -70,4 +70,14 @@ func TestStorage(t *testing.T) {
 
 	assert.Equal(t, []byte{1, 2, 3}, data)
 
+	if err = storage.Delete([]byte("somekey")); err != nil {
+		t.Fatal(err)
+	}
+
+	if data, err = storage.Get(nil, []byte("somekey")); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 0, len(data))
+
 }

@@ -81,7 +81,7 @@ func (storage *Storage) Clear() {
 	}
 }
 
-// Get returns the value associated with key, or nil if no such value exists.
+// Get returns the value associated with key, or an empty slice if no such value exists.
 // The returned slice may be a sub-slice of buf if buf was large enough to hold
 // the entire content. Otherwise, a newly allocated slice will be returned. It
 // is valid to pass a nil buf.
@@ -97,6 +97,13 @@ func (storage *Storage) Get(buf, key []byte) ([]byte, error) {
 // Set is atomic and it is safe for concurrent use by multiple goroutines.
 func (storage *Storage) Set(key, value []byte) error {
 	return storage.db.Set(key, value)
+}
+
+// Delete deletes key and its associated value from the DB.
+//
+// Delete is atomic and it is safe for concurrent use by multiple goroutines.
+func (storage *Storage) Delete(key []byte) error {
+	return storage.db.Delete(key)
 }
 
 // BeginTransaction starts a new transaction. Every call to BeginTransaction must
