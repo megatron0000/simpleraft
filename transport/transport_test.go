@@ -10,7 +10,9 @@ func TestTransport(t *testing.T) {
 	a1 := "localhost:10123"
 	a2 := "localhost:10124"
 	t1 := New(a1)
+	t1.Listen()
 	t2 := New(a2)
+	t2.Listen()
 
 	// actions in t1
 	go func() {

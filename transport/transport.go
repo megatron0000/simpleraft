@@ -45,7 +45,7 @@ func (handler handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write(response)
 }
 
-// New contructs a Transport instance and initiates it
+// New contructs a Transport instance but DOES NOT initiate
 func New(address string) *Transport {
 	handler := handler{}
 	server := &http.Server{
@@ -55,9 +55,12 @@ func New(address string) *Transport {
 	t := &Transport{receiver: make(chan IncomingMessage), server: server}
 	handler.transport = t
 
-	go func() { server.ListenAndServe() }()
-
 	return t
+}
+
+// Listen activates the transport service
+func (transport *Transport) Listen() {
+	go transport.server.ListenAndServe()
 }
 
 // Send sends a message to `address` and returns a channel from
