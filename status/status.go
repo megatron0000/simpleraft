@@ -1,6 +1,7 @@
 package status
 
 import (
+	"encoding/json"
 	"simpleraft/storage"
 	"strconv"
 )
@@ -35,7 +36,9 @@ type Status struct {
 	storage *storage.Storage
 }
 
-// New constructs a Status struct, automatically recovering state from disk, if any
+// New constructs a Status struct, automatically recovering state from disk, if any.
+// `peerAddresses` works as a default value: it will only be used if there is no
+// alternative record already in the disk storage
 func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 	storage *storage.Storage) *Status {
 
@@ -51,6 +54,8 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 		clusterChangeIndex      int64
 		clusterChangeTermSlice  []byte
 		clusterChangeTerm       int64
+		oldPeerAddresses        []byte
+		peerAddressesJSON       []byte
 	)
 
 	// retrieve currentTerm from datastore
@@ -87,6 +92,32 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 		votedFor = ""
 	} else {
 		votedFor = PeerAddress(string(votedForSlice))
+	}
+
+	// retrieve peerAddresses from datastore (if any)
+	oldPeerAddresses, err = storage.Get(
+		nil,
+		[]byte("/raft/peerAddresses"))
+
+	// TODO: how to handle an error here ?
+	if err != nil {
+		panic(err)
+	}
+
+	if oldPeerAddresses == nil {
+		// save it to disk
+		if peerAddressesJSON, err = json.Marshal(peerAddresses); err != nil {
+			panic(err)
+		}
+
+		if err = storage.Set([]byte("/raft/peerAddresses"), peerAddressesJSON); err != nil {
+			panic(err)
+		}
+
+	} else {
+		if err = json.Unmarshal(oldPeerAddresses, &peerAddresses); err != nil {
+			panic(err)
+		}
 	}
 
 	nextIndex = make(map[PeerAddress]int64)
@@ -157,7 +188,7 @@ func (status *Status) NodeAddress() PeerAddress {
 	return status.nodeAddress
 }
 
-// CurrentTerm is the current raft turn, as seen by a raft node (0 in the beggining)
+// CurrentTerm is the current raft turn, as seen by a raft node (0 in the beginning)
 func (status *Status) CurrentTerm() int64 {
 	return status.currentTerm
 }
@@ -197,7 +228,7 @@ func (status *Status) SetVotedFor(newVotedFor PeerAddress) {
 }
 
 // CommitIndex is the index of the most up-to-date log entry known to be
-// committed by this raft node (-1 in the beggining)
+// committed by this raft node (-1 in the beginning)
 func (status *Status) CommitIndex() int64 {
 	return status.commitIndex
 }
@@ -208,7 +239,7 @@ func (status *Status) SetCommitIndex(newCommitIndex int64) {
 }
 
 // LastApplied is the index of the last committed log entry that has already
-// been applied by the raft state machine (-1 in the beggining)
+// been applied by the raft state machine (-1 in the beginning)
 func (status *Status) LastApplied() int64 {
 	return status.lastApplied
 }
@@ -223,8 +254,49 @@ func (status *Status) PeerAddresses() []PeerAddress {
 	return status.peerAddresses
 }
 
+// SetPeerAddresses automatically persists the change (necessary for correctness)
+func (status *Status) SetPeerAddresses(newPeers []PeerAddress) {
+	var (
+		marshal       []byte
+		err           error
+		newNextIndex  map[PeerAddress]int64
+		newMatchIndex map[PeerAddress]int64
+		addr          PeerAddress
+		nextIndex     int64
+		matchIndex    int64
+		ok            bool
+	)
+
+	if marshal, err = json.Marshal(newPeers); err != nil {
+		panic(err)
+	}
+	status.storage.Set([]byte("/raft/peerAddresses"), marshal)
+
+	newNextIndex = make(map[PeerAddress]int64)
+	newMatchIndex = make(map[PeerAddress]int64)
+
+	// rebuild nextIndex and matchIndex maps
+	for _, addr = range newPeers {
+		if nextIndex, ok = status.nextIndex[addr]; ok {
+			newNextIndex[addr] = nextIndex
+		} else {
+			newNextIndex[addr] = 0
+		}
+
+		if matchIndex, ok = status.matchIndex[addr]; ok {
+			newMatchIndex[addr] = matchIndex
+		} else {
+			newMatchIndex[addr] = -1
+		}
+	}
+
+	status.nextIndex = newNextIndex
+	status.matchIndex = newMatchIndex
+	status.peerAddresses = newPeers
+}
+
 // NextIndex is the (as known by leader) next log index a peer is waiting for
-// (0 in the beggining)
+// (0 in the beginning)
 func (status *Status) NextIndex(peer PeerAddress) int64 {
 	return status.nextIndex[peer]
 }
@@ -235,7 +307,7 @@ func (status *Status) SetNextIndex(peer PeerAddress, nextIndex int64) {
 }
 
 // MatchIndex is the (as known by leader) last log index where the leader's log
-// matches the peer's log (-1 in the beggining)
+// matches the peer's log (-1 in the beginning)
 func (status *Status) MatchIndex(peer PeerAddress) int64 {
 	return status.matchIndex[peer]
 }
