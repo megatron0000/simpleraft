@@ -37,13 +37,14 @@ type Status struct {
 }
 
 // New constructs a Status struct, automatically recovering state from disk, if any.
-// `peerAddresses` works as a default value: it will only be used if there is no
-// alternative record already in the disk storage
+// `peerAddresses` and `nodeAddress` work as default values: they will only be used
+// if there is no alternative record present in the disk storage
 func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 	storage *storage.Storage) *Status {
 
 	var (
 		err                     error
+		nodeAddressSlice        []byte
 		currentTermSlice        []byte
 		currentTerm             int64
 		votedForSlice           []byte
@@ -58,10 +59,28 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 		peerAddressesJSON       []byte
 	)
 
+	// retrieve nodeAddress from datastore
+	if nodeAddressSlice, err = storage.Get(nil, []byte("/raft/nodeAddress")); err != nil {
+		panic(err)
+	}
+
+	if nodeAddressSlice == nil {
+		// save it to disk
+		if nodeAddressSlice, err = json.Marshal(nodeAddress); err != nil {
+			panic(err)
+		}
+
+		if err = storage.Set([]byte("/raft/nodeAddress"), nodeAddressSlice); err != nil {
+			panic(err)
+		}
+	} else {
+		if err = json.Unmarshal(nodeAddressSlice, &nodeAddress); err != nil {
+			panic(err)
+		}
+	}
+
 	// retrieve currentTerm from datastore
-	currentTermSlice, err = storage.Get(
-		nil,
-		[]byte("/raft/currentTerm"))
+	currentTermSlice, err = storage.Get(nil, []byte("/raft/currentTerm"))
 
 	// TODO: how to handle an error here ?
 	if err != nil {
@@ -186,6 +205,24 @@ func New(nodeAddress PeerAddress, peerAddresses []PeerAddress,
 // NodeAddress returns the network address which can be used to contact this node
 func (status *Status) NodeAddress() PeerAddress {
 	return status.nodeAddress
+}
+
+// SetNodeAddress automatically persists the change (necessary for correctness)
+func (status *Status) SetNodeAddress(newAddress PeerAddress) {
+	var (
+		marshal []byte
+		err     error
+	)
+
+	status.nodeAddress = newAddress
+
+	if marshal, err = json.Marshal(newAddress); err != nil {
+		panic(err)
+	}
+
+	if err = status.storage.Set([]byte("/raft/nodeAddress"), marshal); err != nil {
+		panic(err)
+	}
 }
 
 // CurrentTerm is the current raft turn, as seen by a raft node (0 in the beginning)

@@ -32,6 +32,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(0), status.NextIndex(peerAddresses[0]))
 	assert.Equal(t, int64(-1), status.MatchIndex(peerAddresses[0]))
 
+	status.SetNodeAddress(PeerAddress("localhost:10"))
 	status.SetCurrentTerm(10)
 	status.SetVotedFor(peerAddresses[0])
 	status.SetCommitIndex(12)
@@ -41,7 +42,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	status.SetMatchIndex(peerAddresses[0], 9)
 	status.SetPeerAddresses(newPeerAddresses)
 
-	assert.Equal(t, nodeAddress, status.NodeAddress())
+	assert.Equal(t, PeerAddress("localhost:10"), status.NodeAddress())
 	assert.Equal(t, int64(10), status.CurrentTerm())
 	assert.Equal(t, peerAddresses[0], status.VotedFor())
 	assert.Equal(t, int64(12), status.CommitIndex())
@@ -55,7 +56,7 @@ func TestRecoverFromDisk(t *testing.T) {
 
 	status = New(nodeAddress, peerAddresses, storage)
 
-	assert.Equal(t, nodeAddress, status.NodeAddress())
+	assert.Equal(t, PeerAddress("localhost:10"), status.NodeAddress())
 	assert.Equal(t, int64(10), status.CurrentTerm())
 	assert.Equal(t, peerAddresses[0], status.VotedFor())
 	assert.Equal(t, int64(-1), status.CommitIndex())
