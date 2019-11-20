@@ -16,15 +16,17 @@ func toString(x int64) string {
 // All struct members are non-exported to enforce usage of
 // functions for reading/writing these values
 type Status struct {
+	state         string
 	nodeAddress   iface.PeerAddress
 	currentTerm   int64
 	votedFor      iface.PeerAddress
+	voteCount     int64
 	commitIndex   int64
 	lastApplied   int64
 	peerAddresses []iface.PeerAddress
 	nextIndex     map[iface.PeerAddress]int64
 	matchIndex    map[iface.PeerAddress]int64
-	// The latest UNCOMITTED log index corresponding to a cluster-change command
+	// The latest log index corresponding to a cluster-change command
 	// -1 if none
 	clusterChangeIndex int64
 	// The term of log entry whose index is `clusterChangeIndex`
@@ -78,30 +80,22 @@ func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
 	}
 
 	// retrieve currentTerm from datastore
-	currentTermSlice, err = storage.Get(nil, []byte("/raft/currentTerm"))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+	if currentTermSlice, err = storage.Get(nil, []byte("/raft/currentTerm")); err != nil {
 		panic(err)
 	}
 
 	if currentTermSlice == nil {
 		currentTerm = 0
 	} else {
-		currentTerm, err = strconv.ParseInt(string(currentTermSlice), 10, 64)
-		// TODO: how to handle an error here ?
-		if err != nil {
+		if currentTerm, err = strconv.ParseInt(string(currentTermSlice), 10, 64); err != nil {
 			panic(err)
 		}
 	}
 
 	// retrieve votedFor from datastore
-	votedForSlice, err = storage.Get(
+	if votedForSlice, err = storage.Get(
 		nil,
-		[]byte("/raft/votedFor"))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte("/raft/votedFor")); err != nil {
 		panic(err)
 	}
 
@@ -112,12 +106,9 @@ func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
 	}
 
 	// retrieve peerAddresses from datastore (if any)
-	oldPeerAddresses, err = storage.Get(
+	if oldPeerAddresses, err = storage.Get(
 		nil,
-		[]byte("/raft/peerAddresses"))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte("/raft/peerAddresses")); err != nil {
 		panic(err)
 	}
 
@@ -146,49 +137,43 @@ func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
 	}
 
 	// retrieve clusterChangeIndex from datastore
-	clusterChangeIndexSlice, err = storage.Get(
+	if clusterChangeIndexSlice, err = storage.Get(
 		nil,
-		[]byte("/raft/clusterChangeIndex"))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte("/raft/clusterChangeIndex")); err != nil {
 		panic(err)
 	}
 
 	if clusterChangeIndexSlice == nil {
 		clusterChangeIndex = -1
 	} else {
-		clusterChangeIndex, err = strconv.ParseInt(string(clusterChangeIndexSlice), 10, 64)
-		// TODO: how to handle an error here ?
-		if err != nil {
+		if clusterChangeIndex, err = strconv.ParseInt(
+			string(clusterChangeIndexSlice), 10, 64); err != nil {
 			panic(err)
 		}
 	}
 
 	// retrieve clusterChangeTerm from datastore
-	clusterChangeTermSlice, err = storage.Get(
+	if clusterChangeTermSlice, err = storage.Get(
 		nil,
-		[]byte("/raft/clusterChangeTerm"))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte("/raft/clusterChangeTerm")); err != nil {
 		panic(err)
 	}
 
 	if clusterChangeTermSlice == nil {
 		clusterChangeTerm = -1
 	} else {
-		clusterChangeTerm, err = strconv.ParseInt(string(clusterChangeTermSlice), 10, 64)
-		// TODO: how to handle an error here ?
-		if err != nil {
+		if clusterChangeTerm, err = strconv.ParseInt(
+			string(clusterChangeTermSlice), 10, 64); err != nil {
 			panic(err)
 		}
 	}
 
 	return &Status{
+		state:              iface.StateFollower,
 		nodeAddress:        nodeAddress,
 		currentTerm:        currentTerm,
 		votedFor:           votedFor,
+		voteCount:          0,
 		commitIndex:        -1,
 		lastApplied:        -1,
 		peerAddresses:      peerAddresses,
@@ -198,6 +183,25 @@ func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
 		clusterChangeTerm:  clusterChangeTerm,
 		storage:            storage,
 	}
+}
+
+// State returns the state of the raft node (one of
+// iface.StateLeader, iface.StateCandidate, iface.StateFollower)
+func (status *Status) State() string {
+	return status.state
+}
+
+// SetState does not persist the change (not needed for correctness)
+func (status *Status) SetState(newState string) {
+	switch newState {
+	case iface.StateFollower:
+	case iface.StateCandidate:
+	case iface.StateLeader:
+	default:
+		panic("unknown state: tried to set node state to " + newState)
+	}
+
+	status.state = newState
 }
 
 // NodeAddress returns the network address which can be used to contact this node
@@ -231,14 +235,12 @@ func (status *Status) CurrentTerm() int64 {
 // SetCurrentTerm automatically persists the change (necessary for correctness)
 func (status *Status) SetCurrentTerm(newTerm int64) {
 	status.currentTerm = newTerm
-	err := status.storage.Set(
+	if err := status.storage.Set(
 		[]byte("/raft/currentTerm"),
-		[]byte(toString(newTerm)))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte(toString(newTerm))); err != nil {
 		panic(err)
 	}
+
 }
 
 // VotedFor is the address of another raft node for which
@@ -252,14 +254,23 @@ func (status *Status) VotedFor() iface.PeerAddress {
 // SetVotedFor automatically persists the change (necessary for correctness)
 func (status *Status) SetVotedFor(newVotedFor iface.PeerAddress) {
 	status.votedFor = newVotedFor
-	err := status.storage.Set(
+	if err := status.storage.Set(
 		[]byte("/raft/votedFor"),
-		[]byte(newVotedFor))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte(newVotedFor)); err != nil {
 		panic(err)
 	}
+
+}
+
+// VoteCount counts how many votes this node received until now
+// in its candidacy. 0 in the beggining
+func (status *Status) VoteCount() int64 {
+	return status.voteCount
+}
+
+// SetVoteCount does not persist the change (not needed for correctness)
+func (status *Status) SetVoteCount(newVoteCount int64) {
+	status.voteCount = newVoteCount
 }
 
 // CommitIndex is the index of the most up-to-date log entry known to be
@@ -352,7 +363,7 @@ func (status *Status) SetMatchIndex(peer iface.PeerAddress, matchIndex int64) {
 	status.matchIndex[peer] = matchIndex
 }
 
-// ClusterChangeIndex is the latest UNCOMITTED log index
+// ClusterChangeIndex is the latest log index
 // corresponding to a cluster-change command. -1 if none
 func (status *Status) ClusterChangeIndex() int64 {
 	return status.clusterChangeIndex
@@ -374,22 +385,16 @@ func (status *Status) SetClusterChange(newClusterChangeIndex, newClusterChangeTe
 	status.storage.BeginTransaction()
 
 	status.clusterChangeIndex = newClusterChangeIndex
-	err = status.storage.Set(
+	if err = status.storage.Set(
 		[]byte("/raft/clusterChangeIndex"),
-		[]byte(toString(newClusterChangeIndex)))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte(toString(newClusterChangeIndex))); err != nil {
 		panic(err)
 	}
 
 	status.clusterChangeTerm = newClusterChangeTerm
-	err = status.storage.Set(
+	if err = status.storage.Set(
 		[]byte("/raft/clusterChangeTerm"),
-		[]byte(toString(newClusterChangeTerm)))
-
-	// TODO: how to handle an error here ?
-	if err != nil {
+		[]byte(toString(newClusterChangeTerm))); err != nil {
 		panic(err)
 	}
 

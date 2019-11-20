@@ -22,9 +22,11 @@ func TestRecoverFromDisk(t *testing.T) {
 
 	status := New(nodeAddress, peerAddresses, storage)
 
+	assert.Equal(t, iface.StateFollower, status.State())
 	assert.Equal(t, nodeAddress, status.NodeAddress())
 	assert.Equal(t, int64(0), status.CurrentTerm())
 	assert.Equal(t, iface.PeerAddress(""), status.VotedFor())
+	assert.Equal(t, int64(0), status.VoteCount())
 	assert.Equal(t, peerAddresses, status.PeerAddresses())
 	assert.Equal(t, int64(-1), status.CommitIndex())
 	assert.Equal(t, int64(-1), status.LastApplied())
@@ -33,9 +35,11 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(0), status.NextIndex(peerAddresses[0]))
 	assert.Equal(t, int64(-1), status.MatchIndex(peerAddresses[0]))
 
+	status.SetState(iface.StateLeader)
 	status.SetNodeAddress(iface.PeerAddress("localhost:10"))
 	status.SetCurrentTerm(10)
 	status.SetVotedFor(peerAddresses[0])
+	status.SetVoteCount(4)
 	status.SetCommitIndex(12)
 	status.SetLastApplied(9)
 	status.SetClusterChange(13, 17)
@@ -43,9 +47,11 @@ func TestRecoverFromDisk(t *testing.T) {
 	status.SetMatchIndex(peerAddresses[0], 9)
 	status.SetPeerAddresses(newPeerAddresses)
 
+	assert.Equal(t, iface.StateLeader, status.State())
 	assert.Equal(t, iface.PeerAddress("localhost:10"), status.NodeAddress())
 	assert.Equal(t, int64(10), status.CurrentTerm())
 	assert.Equal(t, peerAddresses[0], status.VotedFor())
+	assert.Equal(t, int64(4), status.VoteCount())
 	assert.Equal(t, int64(12), status.CommitIndex())
 	assert.Equal(t, int64(9), status.LastApplied())
 	assert.Equal(t, int64(13), status.ClusterChangeIndex())
@@ -57,9 +63,11 @@ func TestRecoverFromDisk(t *testing.T) {
 
 	status = New(nodeAddress, peerAddresses, storage)
 
+	assert.Equal(t, iface.StateFollower, status.State())
 	assert.Equal(t, iface.PeerAddress("localhost:10"), status.NodeAddress())
 	assert.Equal(t, int64(10), status.CurrentTerm())
 	assert.Equal(t, peerAddresses[0], status.VotedFor())
+	assert.Equal(t, int64(0), status.VoteCount())
 	assert.Equal(t, int64(-1), status.CommitIndex())
 	assert.Equal(t, int64(-1), status.LastApplied())
 	assert.Equal(t, int64(13), status.ClusterChangeIndex())
