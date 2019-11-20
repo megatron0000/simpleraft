@@ -1,0 +1,19 @@
+                              2: Transforms the message
+                              to one of the Msg*                          4: Handler decides
+                              family of structs                           what to do
+                                                       3: Pass struct
+                               +-----------------+     to handler        +------------------+
+                               |                 |     along with        |                  |
+Transport   1: message comes   |                 |     status, log data  |                  |
+          +------------------> |   Executor      |  +----------------->  |   RuleHandler    |
+Timeout                        |                 |                       |                  |
+                               |                 |                       |                  |
+                               +-----------------+                       +------------------+
+
+          <---------------+      6: Applies the
+                                 actions            <-----------------+
+           7: Responds to                              5: Handler replies with a list
+           the communicating                           of structs belonging to the
+           peer with the                               Reply* and Action* families of
+           Reply* demanded by                          structs
+           the RuleHandler
