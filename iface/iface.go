@@ -229,6 +229,8 @@ type ReplyCompleted struct {
 // whether to vote or not; so we must communicate
 // this decision to the caller
 type ReplyDecidedVote struct {
+	VoteGranted bool
+	Term        int64
 }
 
 // ReplyAppendEntries means: A caller called
@@ -236,6 +238,8 @@ type ReplyDecidedVote struct {
 // have processed this request; so we must
 // communicate the results to the caller
 type ReplyAppendEntries struct {
+	Success bool
+	Term    int64
 }
 
 // ActionAppendLog means some entries should
