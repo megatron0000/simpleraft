@@ -368,27 +368,27 @@ type ActionAppendEntries struct {
 // All methods must return a slice of structs belonging to the Reply* and Action*
 // family of structs
 type RuleHandler interface {
-	FollowerOnStateChanged(msg MsgStateChanged, log *RaftLog, status *Status) []interface{}
-	FollowerOnAppendEntries(msg MsgAppendEntries, log *RaftLog, status *Status) []interface{}
-	FollowerOnRequestVote(msg MsgRequestVote, log *RaftLog, status *Status) []interface{}
-	FollowerOnAddServer(msg MsgAddServer, log *RaftLog, status *Status) []interface{}
-	FollowerOnRemoveServer(msg MsgRemoveServer, log *RaftLog, status *Status) []interface{}
-	FollowerOnTimeout(msg MsgTimeout, log *RaftLog, status *Status) []interface{}
-	FollowerOnStateMachineCommand(msg MsgStateMachineCommand, log *RaftLog, status *Status) []interface{}
+	FollowerOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
+	FollowerOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
+	FollowerOnRequestVote(msg MsgRequestVote, log RaftLog, status Status) []interface{}
+	FollowerOnAddServer(msg MsgAddServer, log RaftLog, status Status) []interface{}
+	FollowerOnRemoveServer(msg MsgRemoveServer, log RaftLog, status Status) []interface{}
+	FollowerOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
+	FollowerOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
 
-	CandidateOnStateChanged(msg MsgStateChanged, log *RaftLog, status *Status) []interface{}
-	CandidateOnAppendEntries(msg MsgAppendEntries, log *RaftLog, status *Status) []interface{}
-	CandidateOnRequestVote(msg MsgRequestVote, log *RaftLog, status *Status) []interface{}
-	CandidateOnAddServer(msg MsgAddServer, log *RaftLog, status *Status) []interface{}
-	CandidateOnRemoveServer(msg MsgRemoveServer, log *RaftLog, status *Status) []interface{}
-	CandidateOnTimeout(msg MsgTimeout, log *RaftLog, status *Status) []interface{}
-	CandidateOnStateMachineCommand(msg MsgStateMachineCommand, log *RaftLog, status *Status) []interface{}
+	CandidateOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
+	CandidateOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
+	CandidateOnRequestVote(msg MsgRequestVote, log RaftLog, status Status) []interface{}
+	CandidateOnAddServer(msg MsgAddServer, log RaftLog, status Status) []interface{}
+	CandidateOnRemoveServer(msg MsgRemoveServer, log RaftLog, status Status) []interface{}
+	CandidateOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
+	CandidateOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
 
-	LeaderOnStateChanged(msg MsgStateChanged, log *RaftLog, status *Status) []interface{}
-	LeaderOnAppendEntries(msg MsgAppendEntries, log *RaftLog, status *Status) []interface{}
-	LeaderOnRequestVote(msg MsgRequestVote, log *RaftLog, status *Status) []interface{}
-	LeaderOnAddServer(msg MsgAddServer, log *RaftLog, status *Status) []interface{}
-	LeaderOnRemoveServer(msg MsgRemoveServer, log *RaftLog, status *Status) []interface{}
-	LeaderOnTimeout(msg MsgTimeout, log *RaftLog, status *Status) []interface{}
-	LeaderOnStateMachineCommand(msg MsgStateMachineCommand, log *RaftLog, status *Status) []interface{}
+	LeaderOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
+	LeaderOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
+	LeaderOnRequestVote(msg MsgRequestVote, log RaftLog, status Status) []interface{}
+	LeaderOnAddServer(msg MsgAddServer, log RaftLog, status Status) []interface{}
+	LeaderOnRemoveServer(msg MsgRemoveServer, log RaftLog, status Status) []interface{}
+	LeaderOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
+	LeaderOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
 }
