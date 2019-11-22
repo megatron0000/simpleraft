@@ -2,6 +2,7 @@ package raftlog
 
 import (
 	"encoding/json"
+	"errors"
 	"simpleraft/iface"
 	"simpleraft/storage"
 	"strconv"
@@ -97,6 +98,34 @@ func (log *RaftLog) Append(entry iface.LogEntry) (err error) {
 		[]byte(toString(log.lastIndex)))
 
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Update changes the information associated to a specified LogEntry.
+// Everything EXCEPT the entry's index is updated on disk.
+//
+// Returns an error if the specified index did not already exist on the log
+func (log *RaftLog) Update(index int64, entry iface.LogEntry) error {
+
+	var (
+		marshal []byte
+		err     error
+	)
+
+	if index > log.lastIndex {
+		return errors.New("index greater than greatest index in the log")
+	}
+
+	if marshal, err = json.Marshal(entry); err != nil {
+		return err
+	}
+
+	if err = log.storage.Set(
+		[]byte("/raft/log/index="+toString(index)),
+		marshal); err != nil {
 		return err
 	}
 
