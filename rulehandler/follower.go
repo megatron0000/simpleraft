@@ -20,6 +20,11 @@ func (handler *RuleHandler) FollowerOnStateChanged(msg iface.MsgStateChanged, lo
 func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0) // list of actions created
 
+	actions = append(actions, iface.ActionResetTimer{HalfTime: false})   // timeout should be reseted
+	if (msg.Term < status.CurrentTerm()){
+		actions = append(actions, iface.ActionSetCurrentTerm{NewCurrentTerm: msg.Term})
+	}
+
 	// If 'append entry' is from a leader with smaller term OR log matching property not achieved yet
 	entry, err := log.Get(msg.PrevLogIndex)
 	if err != nil {
@@ -51,6 +56,7 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0) // list of actions created
 
+	actions = append(actions, iface.ActionResetTimer{HalfTime: false})   // timeout should be reseted
 	// if candidate is in a smaller term, vote is not granted
 	if msg.Term < status.CurrentTerm() {
 		actions = append(actions, iface.ReplyDecidedVote{VoteGranted: false, Term: status.CurrentTerm()}) // not successfull vote
@@ -97,4 +103,18 @@ func (handler *RuleHandler) FollowerOnStateMachineCommand(msg iface.MsgStateMach
 	actions := make([]interface{}, 0)                 // list of actions created
 	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
 	return actions
+}
+
+func (handler *RuleHandler) FollowerOnStateMachineProbe(msg iface.MsgStateMachineProbe, log iface.RaftLog, status iface.Status) []interface{} {
+	actions := make([]interface{}, 0)                 // list of actions created
+	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
+	return actions
+}
+
+func (handler *RuleHandler) FollowerOnAppendEntriesReply(msg iface.MsgAppendEntriesReply, log iface.RaftLog, status iface.Status) []interface{} {
+	return make([]interface{}, 0) 
+}
+
+func (handler *RuleHandler) FollowerOnRequestVoteReply(msg iface.MsgRequestVoteReply, log iface.RaftLog, status iface.Status) []interface{} {
+	return make([]interface{}, 0) 
 }
