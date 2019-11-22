@@ -217,6 +217,26 @@ type MsgStateMachineProbe struct {
 	Term  int64
 }
 
+// MsgAppendEntriesReply means: the current raft
+// node sent AppendEntries to another one sometime
+// in the past; now we are receiving the result
+type MsgAppendEntriesReply struct {
+	// address of the raft node who is sending the reply
+	Address PeerAddress
+	Success bool
+	Term    int64
+}
+
+// MsgRequestVoteReply means: the current raft
+// node sent RequestVote to another one sometime
+// in the past; now we are receiving the result
+type MsgRequestVoteReply struct {
+	// address of the raft node who is sending the reply
+	Address     PeerAddress
+	VoteGranted bool
+	Term        int64
+}
+
 // ReplyNotLeader means: A client requested an action
 // to the current raft node; this node is not the leader,
 // but the action requires the leader; so we must warn the
@@ -260,6 +280,8 @@ type ReplyCompleted struct {
 // whether to vote or not; so we must communicate
 // this decision to the caller
 type ReplyDecidedVote struct {
+	// address of the raft node who is sending the reply
+	Address     PeerAddress
 	VoteGranted bool
 	Term        int64
 }
@@ -269,6 +291,8 @@ type ReplyDecidedVote struct {
 // have processed this request; so we must
 // communicate the results to the caller
 type ReplyAppendEntries struct {
+	// address of the raft node who is sending the reply
+	Address PeerAddress
 	Success bool
 	Term    int64
 }
@@ -410,7 +434,6 @@ type ActionRequestVote struct {
 // wants this message to be redelivered to him (as if it was another
 // message).
 type ActionReprocess struct {
-
 }
 
 // RuleHandler is the interface representing the actions performed by the raft node
