@@ -405,6 +405,14 @@ type ActionRequestVote struct {
 	Destination PeerAddress
 }
 
+// ActionReprocess means: the current raft node received a message
+// (any of the Msg* structs), processed it, BUT the node
+// wants this message to be redelivered to him (as if it was another
+// message).
+type ActionReprocess struct {
+
+}
+
 // RuleHandler is the interface representing the actions performed by the raft node
 // when any event (message) arrives at the node.
 //
