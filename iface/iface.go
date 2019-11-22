@@ -453,6 +453,8 @@ type RuleHandler interface {
 	FollowerOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
 	FollowerOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
 	FollowerOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
+	FollowerOnAppendEntriesReply(msg MsgAppendEntriesReply, log RaftLog, status Status) []interface{}
+	FollowerOnRequestVoteReply(msg MsgRequestVoteReply, log RaftLog, status Status) []interface{}
 
 	CandidateOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
 	CandidateOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
@@ -462,6 +464,8 @@ type RuleHandler interface {
 	CandidateOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
 	CandidateOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
 	CandidateOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
+	CandidateOnAppendEntriesReply(msg MsgAppendEntriesReply, log RaftLog, status Status) []interface{}
+	CandidateOnRequestVoteReply(msg MsgRequestVoteReply, log RaftLog, status Status) []interface{}
 
 	LeaderOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
 	LeaderOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
@@ -471,4 +475,6 @@ type RuleHandler interface {
 	LeaderOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
 	LeaderOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
 	LeaderOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
+	LeaderOnAppendEntriesReply(msg MsgAppendEntriesReply, log RaftLog, status Status) []interface{}
+	LeaderOnRequestVoteReply(msg MsgRequestVoteReply, log RaftLog, status Status) []interface{}
 }
