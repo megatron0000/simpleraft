@@ -35,13 +35,19 @@ var (
 )
 
 // LogEntry represents an entry in the log.
-// `command` is []byte because there is no a-priori structure
+//
+// `Command` is []byte because there is no a-priori structure
 // to be imposed (on the contrary: each application on top of raft has
-// its intended semantics for the command)
+// its intended semantics for the command).
+//
+// `Result` is the value returned by the application layer's state
+// machine when it executes the command.
 type LogEntry struct {
-	Term    int64
+	Term int64
+	// Kind is one of the above Entry* constants (EntryNoOp etc.)
 	Kind    string
 	Command []byte
+	Result  []byte
 }
 
 // RaftLog provides log read/delete/append functionalities.
@@ -178,14 +184,37 @@ type MsgRemoveServer struct {
 type MsgTimeout struct {
 }
 
-// MsgStateMachineCommand means: the caller issued a
+// MsgStateMachineCommand means: the client issued a new
 // state machine command to the current raft node.
 //
 // The value of `Command` must be interpreted by the specific
 // state machine implementation (i.e. application layer)
-// running on top of raft
+// running on top of raft.
+//
+// It is responsibility of the raft rule handler to
+// insert this command-request in a log entry and replicate
+// the entry until it is committed (and only then actually
+// apply the command by issuing ActionStateMachineApply)
 type MsgStateMachineCommand struct {
 	Command []byte
+}
+
+// MsgStateMachineProbe means: the client issued a state
+// machine command sometime in the past; now he is probing
+// whether the command completed or not, and if yes, what
+// is its result.
+//
+// `Index` and `Term` are the log-position in which
+// the client's command is located.
+//
+// The raft rule handler should reply with one of: ReplyNotLeader,
+// ReplyCheckLater, ReplyFailed, ReplyCompleted
+//
+// If the command is completed, its result will be at the respective
+// log entry (the executor component guarantees that this is true)
+type MsgStateMachineProbe struct {
+	Index int64
+	Term  int64
 }
 
 // ReplyNotLeader means: A client requested an action
@@ -204,8 +233,10 @@ type ReplyCheckLater struct {
 }
 
 // ReplyFailed means: A client requested an action
-// to the current raft node; some kind of failure occured;
-// so we must communicate this fact to the client
+// to the current raft node; some kind of failure occurred;
+// so we must communicate this fact to the client. Example of
+// failure: command requested by client was overwritten in the log
+// by any other entry. Client must reissue the command
 type ReplyFailed struct {
 }
 
@@ -224,7 +255,7 @@ type ReplyCompleted struct {
 	Result []byte
 }
 
-// ReplyDecidedVote means: A caller request the
+// ReplyDecidedVote means: A caller requested the
 // current raft node to vote in them; we have decided
 // whether to vote or not; so we must communicate
 // this decision to the caller
@@ -320,16 +351,11 @@ type ActionSetMatchIndex struct {
 	NewMatchIndex int64
 }
 
-// ActionSetClusterChangeIndex means the raft node's
-// clusterChangeIndex should be changed
-type ActionSetClusterChangeIndex struct {
+// ActionSetClusterChange means the raft node's
+// clusterChangeIndex and clusterChangeTerm should be changed
+type ActionSetClusterChange struct {
 	NewClusterChangeIndex int64
-}
-
-// ActionSetClusterChangeTerm means the raft node's
-// clusterChangeTerm should be changed
-type ActionSetClusterChangeTerm struct {
-	NewClusterChangeTerm int64
+	NewClusterChangeTerm  int64
 }
 
 // ActionResetTimer means the raft node's
@@ -342,25 +368,41 @@ type ActionResetTimer struct {
 	HalfTime bool
 }
 
-// ActionStateMachineApply means
-// a log entry's command should be
-// applied by the application layer's
-// state machine
+// ActionStateMachineApply means a log entry's command should be
+// applied by the application layer's state machine.
+//
+// The executor component will take care of learning about the command's
+// result and storing it at the appropriate log entry's `Result` field
+// (so that this result can be later retrieved in the context of
+// MsgStateMachineProbe)
 type ActionStateMachineApply struct {
 	EntryIndex int64
 }
 
 // ActionAppendEntries means the current raft node
 // (the raft leader) wants to send AppendEntries
-// message to another node. Besides the fields
-// included in this struct, all remaining necessary
-// information (leader commit index etc.) is
-// automatically inferred by the Executor component
+// message to another node.
 type ActionAppendEntries struct {
-	Destination  PeerAddress
-	Entries      []LogEntry
-	PrevLogIndex int64
-	PrevLogTerm  int64
+	Term              int64
+	LeaderAddress     PeerAddress
+	LeaderCommitIndex int64
+	Entries           []LogEntry
+	PrevLogIndex      int64
+	PrevLogTerm       int64
+	// Destination is the node who should receive the message
+	Destination PeerAddress
+}
+
+// ActionRequestVote means the current raft node
+// (a raft candidate) wants to send RequestVote
+// message to another node.
+type ActionRequestVote struct {
+	Term             int64
+	CandidateAddress PeerAddress
+	LastLogIndex     int64
+	LastLogTerm      int64
+	// Destination is the node who should receive the message
+	Destination PeerAddress
 }
 
 // RuleHandler is the interface representing the actions performed by the raft node
@@ -379,6 +421,7 @@ type RuleHandler interface {
 	FollowerOnRemoveServer(msg MsgRemoveServer, log RaftLog, status Status) []interface{}
 	FollowerOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
 	FollowerOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
+	FollowerOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
 
 	CandidateOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
 	CandidateOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
@@ -387,6 +430,7 @@ type RuleHandler interface {
 	CandidateOnRemoveServer(msg MsgRemoveServer, log RaftLog, status Status) []interface{}
 	CandidateOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
 	CandidateOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
+	CandidateOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
 
 	LeaderOnStateChanged(msg MsgStateChanged, log RaftLog, status Status) []interface{}
 	LeaderOnAppendEntries(msg MsgAppendEntries, log RaftLog, status Status) []interface{}
@@ -395,4 +439,5 @@ type RuleHandler interface {
 	LeaderOnRemoveServer(msg MsgRemoveServer, log RaftLog, status Status) []interface{}
 	LeaderOnTimeout(msg MsgTimeout, log RaftLog, status Status) []interface{}
 	LeaderOnStateMachineCommand(msg MsgStateMachineCommand, log RaftLog, status Status) []interface{}
+	LeaderOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
 }
