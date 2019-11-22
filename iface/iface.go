@@ -332,6 +332,10 @@ type ActionSetClusterChangeTerm struct {
 // timer should be reset (i.e. it will count
 // down until 0 again)
 type ActionResetTimer struct {
+	// HalfTime means: Reset the timer to half the min election timeout.
+	// This is needed for leaders to send AppendEntries before any node's
+	// election timeout
+	HalfTime bool
 }
 
 // ActionStateMachineApply means
@@ -340,4 +344,51 @@ type ActionResetTimer struct {
 // state machine
 type ActionStateMachineApply struct {
 	EntryIndex int64
+}
+
+// ActionAppendEntries means the current raft node
+// (the raft leader) wants to send AppendEntries
+// message to another node. Besides the fields
+// included in this struct, all remaining necessary
+// information (leader commit index etc.) is
+// automatically inferred by the Executor component
+type ActionAppendEntries struct {
+	Destination  PeerAddress
+	Entries      []LogEntry
+	PrevLogIndex int64
+	PrevLogTerm  int64
+}
+
+// RuleHandler is the interface representing the actions performed by the raft node
+// when any event (message) arrives at the node.
+//
+// This interface isolates the abstract rules of the raft protocol from the implementation
+// details related to log/status/transport services
+//
+// All methods must return a slice of structs belonging to the Reply* and Action*
+// family of structs
+type RuleHandler interface {
+	FollowerOnStateChanged(msg MsgStateChanged, log *RaftLog, status *Status) []interface{}
+	FollowerOnAppendEntries(msg MsgAppendEntries, log *RaftLog, status *Status) []interface{}
+	FollowerOnRequestVote(msg MsgRequestVote, log *RaftLog, status *Status) []interface{}
+	FollowerOnAddServer(msg MsgAddServer, log *RaftLog, status *Status) []interface{}
+	FollowerOnRemoveServer(msg MsgRemoveServer, log *RaftLog, status *Status) []interface{}
+	FollowerOnTimeout(msg MsgTimeout, log *RaftLog, status *Status) []interface{}
+	FollowerOnStateMachineCommand(msg MsgStateMachineCommand, log *RaftLog, status *Status) []interface{}
+
+	CandidateOnStateChanged(msg MsgStateChanged, log *RaftLog, status *Status) []interface{}
+	CandidateOnAppendEntries(msg MsgAppendEntries, log *RaftLog, status *Status) []interface{}
+	CandidateOnRequestVote(msg MsgRequestVote, log *RaftLog, status *Status) []interface{}
+	CandidateOnAddServer(msg MsgAddServer, log *RaftLog, status *Status) []interface{}
+	CandidateOnRemoveServer(msg MsgRemoveServer, log *RaftLog, status *Status) []interface{}
+	CandidateOnTimeout(msg MsgTimeout, log *RaftLog, status *Status) []interface{}
+	CandidateOnStateMachineCommand(msg MsgStateMachineCommand, log *RaftLog, status *Status) []interface{}
+
+	LeaderOnStateChanged(msg MsgStateChanged, log *RaftLog, status *Status) []interface{}
+	LeaderOnAppendEntries(msg MsgAppendEntries, log *RaftLog, status *Status) []interface{}
+	LeaderOnRequestVote(msg MsgRequestVote, log *RaftLog, status *Status) []interface{}
+	LeaderOnAddServer(msg MsgAddServer, log *RaftLog, status *Status) []interface{}
+	LeaderOnRemoveServer(msg MsgRemoveServer, log *RaftLog, status *Status) []interface{}
+	LeaderOnTimeout(msg MsgTimeout, log *RaftLog, status *Status) []interface{}
+	LeaderOnStateMachineCommand(msg MsgStateMachineCommand, log *RaftLog, status *Status) []interface{}
 }
