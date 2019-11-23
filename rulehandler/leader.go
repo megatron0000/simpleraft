@@ -186,7 +186,7 @@ func (rulehandler *RuleHandler) LeaderOnAppendEntriesReply(msg iface.MsgAppendEn
 		//decrement nextIndex and retry (§5.3)
 		actions = append(actions, iface.ActionSetNextIndex{
 			Peer:         msg.Address,
-			NewNextIndex: log.LastIndex() - 1})
+			NewNextIndex: status.NextIndex(msg.Address) - 1})
 	}
 	return actions
 }
