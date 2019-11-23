@@ -99,6 +99,11 @@ func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, lo
 		actions = append(actions, iface.ActionSetState{
 			NewState: iface.StateFollower})
 		actions = append(actions, iface.ActionReprocess{})
+	} else {
+		actions = append(actions, iface.ReplyDecidedVote{
+			Address:     msg.CandidateAddress,
+			VoteGranted: false,
+			Term:        status.CurrentTerm()})
 	}
 	return actions
 }
