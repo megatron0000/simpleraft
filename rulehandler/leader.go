@@ -122,7 +122,7 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 		if log.LastIndex() >= status.NextIndex(address) {
 			//If last log index ≥ nextIndex for a follower: send
 			//AppendEntries RPC with log entries starting at nextIndex
-			lastLog, _ := log.Get(status.NextIndex(address))
+			lastLog, _ := log.Get(status.NextIndex(address) - 1)
 			for i := status.NextIndex(address); i <= log.LastIndex(); i++ {
 				entry, _ := log.Get(i)
 				entries = append(entries, *entry)
@@ -130,16 +130,15 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 			actions = append(actions, iface.ActionAppendEntries{
 				Destination:  address,
 				Entries:      entries,
-				PrevLogIndex: status.NextIndex(address),
+				PrevLogIndex: status.NextIndex(address) - 1,
 				PrevLogTerm:  lastLog.Term})
 		} else {
 			//Heartbeat
-			lastLog, _ := log.Get(log.LastIndex())
 			actions = append(actions, iface.ActionAppendEntries{
 				Destination:  address,
 				Entries:      entries,
 				PrevLogIndex: log.LastIndex(),
-				PrevLogTerm:  lastLog.Term})
+				PrevLogTerm:  status.CurrentTerm()})
 		}
 	}
 	return actions
