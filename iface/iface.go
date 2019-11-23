@@ -144,7 +144,9 @@ type StateMachine interface {
 }
 
 // MsgStateChanged means: The raft state (leader/candidate/follower)
-// has just changed to a new value, DIFFERENT from the prior one.
+// has just changed. Maybe it changed to a new value (example: follower->candidate),
+// or it "changed" to the same value it was at before (example: candidate->candidate).
+// In both cases, the rule handler will be called with a MsgStateChanged input
 type MsgStateChanged struct {
 }
 

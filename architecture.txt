@@ -29,7 +29,7 @@
 |                                       |   |                                      |  |                                       |
 |  Stores state_specific information:   |   |   Implements message passing between |  |   Appends (or changes) entries        |
 |  currentTerm, votedFor, commitIndex,  |   |   Raft nodes or between a client and |  |   to the log, saves the log to disk,  |
-|  lastApplied                          |   |   a Raft node                        |  |   and reads the log.                  |
+|  lastApplied etc.                     |   |   a Raft node                        |  |   and reads the log.                  |
 +---------------------------------------+   +--------------------------------------+  +--------+------------------------------+
                                                                                                |
                        +                                                                       |

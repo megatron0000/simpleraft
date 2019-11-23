@@ -95,6 +95,7 @@ func (handler *RuleHandler) FollowerOnRemoveServer(msg iface.MsgRemoveServer, lo
 func (handler *RuleHandler) FollowerOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0)                                               // list of actions created
 	actions = append(actions, iface.ActionSetState{NewState: iface.StateCandidate}) // a timeout for a follower means it should change its state to candidate
+	actions = append(actions, handler.FollowerOnTimeout(msg, log, status)...)
 	return actions
 }
 
@@ -105,16 +106,19 @@ func (handler *RuleHandler) FollowerOnStateMachineCommand(msg iface.MsgStateMach
 	return actions
 }
 
+// FollowerOnStateMachineProbe implements raft rules
 func (handler *RuleHandler) FollowerOnStateMachineProbe(msg iface.MsgStateMachineProbe, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0)                 // list of actions created
 	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
 	return actions
 }
 
+// FollowerOnAppendEntriesReply implements raft rules
 func (handler *RuleHandler) FollowerOnAppendEntriesReply(msg iface.MsgAppendEntriesReply, log iface.RaftLog, status iface.Status) []interface{} {
-	return make([]interface{}, 0) 
+	return []interface{}{}
 }
 
+// FollowerOnRequestVoteReply implements raft rules
 func (handler *RuleHandler) FollowerOnRequestVoteReply(msg iface.MsgRequestVoteReply, log iface.RaftLog, status iface.Status) []interface{} {
-	return make([]interface{}, 0) 
+	return []interface{}{}
 }
