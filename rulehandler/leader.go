@@ -120,13 +120,17 @@ func (rulehandler *RuleHandler) LeaderOnStateMachineCommand(msg iface.MsgStateMa
 func (rulehandler *RuleHandler) LeaderOnStateMachineProbe(msg iface.MsgStateMachineProbe, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0)
 	logClientCommand, _ := log.Get(msg.Index)
-	if msg.Term != logClientCommand.Term {
-		//Client command overwritten
+	if logClientCommand == nil {
+		//Client command not in log
 		actions = append(actions, iface.ReplyFailed{})
-	} else if len(logClientCommand.Result) == 0 {
+	} else if status.LastApplied() < msg.Index {
 		//No results yet
 		actions = append(actions, iface.ReplyCheckLater{})
+	} else if msg.Term != logClientCommand.Term {
+		//Client command overwritten
+		actions = append(actions, iface.ReplyFailed{})
 	} else {
+		//Result available
 		actions = append(actions, iface.ReplyCompleted{
 			Result: logClientCommand.Result})
 	}
