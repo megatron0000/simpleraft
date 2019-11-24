@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"fmt"
+	"strings"
 )
 
 // Transport represents an active transport service listening on a port
@@ -69,16 +71,22 @@ func (transport *Transport) Send(address string, data []byte) (replyChan chan []
 	client := &http.Client{}
 	replyChan = make(chan []byte)
 
+	if !strings.HasPrefix(address, "http://") {
+		address = "http://" + address
+	}
+
 	// wait for response
 	go func() {
 		res, err := client.Post(address, "application/json", bytes.NewReader(data))
 		if err != nil {
+			fmt.Printf("transport error: %+v\n", err)
 			close(replyChan)
 			return
 		}
 		defer res.Body.Close()
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
+			fmt.Printf("transport error: %+v\n", err)
 			close(replyChan)
 			return
 		}
