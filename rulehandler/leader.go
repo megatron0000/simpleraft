@@ -2,6 +2,7 @@ package rulehandler
 
 import (
 	"math"
+	"fmt"
 	"simpleraft/iface"
 )
 
@@ -14,7 +15,7 @@ func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, 
 		Kind:    iface.EntryNoOp,
 		Command: make([]byte, 0),
 		Result:  make([]byte, 0)}
-	actions = append(actions, firstEntry)
+	actions = append(actions, iface.ActionAppendLog{Entries: []iface.LogEntry{firstEntry}})
 	for _, address := range status.PeerAddresses() {
 		//for each server, index of the next log entry
 		//to send to that server (initialized to leader
@@ -85,7 +86,13 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 			//If last log index ≥ nextIndex for a follower: send
 			//AppendEntries RPC with log entries starting at nextIndex
 			lastLog, _ := log.Get(status.NextIndex(address) - 1)
+			lastTerm := int64(-1)
+			if lastLog != nil {
+				lastTerm = lastLog.Term
+			}
+			fmt.Println("My last index is ", log.LastIndex())
 			for i := status.NextIndex(address); i <= log.LastIndex(); i++ {
+				fmt.Println("Getting index ", i)
 				entry, _ := log.Get(i)
 				entries = append(entries, *entry)
 			}
@@ -93,7 +100,7 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 				Destination:  address,
 				Entries:      entries,
 				PrevLogIndex: status.NextIndex(address) - 1,
-				PrevLogTerm:  lastLog.Term})
+				PrevLogTerm:  lastTerm})
 		} else {
 			//Heartbeat
 			actions = append(actions, iface.ActionAppendEntries{
@@ -138,7 +145,7 @@ func (rulehandler *RuleHandler) LeaderOnStateMachineProbe(msg iface.MsgStateMach
 }
 func (rulehandler *RuleHandler) LeaderOnAppendEntriesReply(msg iface.MsgAppendEntriesReply, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0)
-	if msg.Success && msg.Term == status.CurrentTerm() {
+	if msg.Success {
 		//If successful: update nextIndex and matchIndex for
 		//follower (§5.3)
 		actions = append(actions, iface.ActionSetNextIndex{

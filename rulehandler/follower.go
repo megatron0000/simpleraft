@@ -20,8 +20,8 @@ func (handler *RuleHandler) FollowerOnStateChanged(msg iface.MsgStateChanged, lo
 func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0) // list of actions created
 
-	actions = append(actions, iface.ActionResetTimer{HalfTime: false})   // timeout should be reseted
-	if (msg.Term < status.CurrentTerm()){
+	actions = append(actions, iface.ActionResetTimer{HalfTime: false}) // timeout should be reseted
+	if msg.Term > status.CurrentTerm() {
 		actions = append(actions, iface.ActionSetCurrentTerm{NewCurrentTerm: msg.Term})
 	}
 
@@ -30,15 +30,17 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 	if err != nil {
 		panic(err)
 	}
-	if (msg.Term < status.CurrentTerm()) || (msg.Term == status.CurrentTerm() && entry.Term != msg.PrevLogTerm) {
-		actions = append(actions, iface.ReplyAppendEntries{Success: false, Term: status.CurrentTerm()}) // not successfull append entry
+	if msg.PrevLogIndex != int64(-1) && (msg.Term < status.CurrentTerm() || entry == nil || (msg.Term == status.CurrentTerm() && entry.Term != msg.PrevLogTerm)) {
+		actions = append(actions, iface.ReplyAppendEntries{Address: status.NodeAddress(), Success: false, Term: status.CurrentTerm()}) // not successfull append entry
 		return actions
 	}
 
 	// as program jumped the if statement above, we have a successfull append entry
-	actions = append(actions, iface.ReplyAppendEntries{Success: true, Term: status.CurrentTerm()})
-	actions = append(actions, iface.ActionDeleteLog{Count: (log.LastIndex() + 1 - msg.PrevLogIndex)}) // delete all entries in log after PrevLogIndex
-	actions = append(actions, iface.ActionAppendLog{Entries: msg.Entries})                            // append all entries sent by leader
+	actions = append(actions, iface.ReplyAppendEntries{Address: status.NodeAddress(), Success: true, Term: status.CurrentTerm()})
+	if len(msg.Entries) > 0 {
+		actions = append(actions, iface.ActionDeleteLog{Count: (log.LastIndex() - msg.PrevLogIndex)}) // delete all entries in log after PrevLogIndex
+		actions = append(actions, iface.ActionAppendLog{Entries: msg.Entries})                        // append all entries sent by leader
+	}
 
 	if msg.LeaderCommitIndex > status.CommitIndex() {
 		actions = append(actions, iface.ActionSetCommitIndex{
@@ -56,7 +58,7 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0) // list of actions created
 
-	actions = append(actions, iface.ActionResetTimer{HalfTime: false})   // timeout should be reseted
+	actions = append(actions, iface.ActionResetTimer{HalfTime: false}) // timeout should be reseted
 	// if candidate is in a smaller term, vote is not granted
 	if msg.Term < status.CurrentTerm() {
 		actions = append(actions, iface.ReplyDecidedVote{VoteGranted: false, Term: status.CurrentTerm()}) // not successfull vote
@@ -93,9 +95,9 @@ func (handler *RuleHandler) FollowerOnRemoveServer(msg iface.MsgRemoveServer, lo
 
 // FollowerOnTimeout implements raft rules
 func (handler *RuleHandler) FollowerOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0)                                               // list of actions created
+	actions := make([]interface{}, 0) // list of actions created
+	actions = append(actions, iface.ActionResetTimer{HalfTime: false})
 	actions = append(actions, iface.ActionSetState{NewState: iface.StateCandidate}) // a timeout for a follower means it should change its state to candidate
-	actions = append(actions, handler.FollowerOnTimeout(msg, log, status)...)
 	return actions
 }
 

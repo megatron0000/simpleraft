@@ -4,3 +4,8 @@ package rulehandler
 type RuleHandler struct {
 
 }
+
+// New constructs a RuleHandler instance
+func New() *RuleHandler {
+	return &RuleHandler{}
+}
