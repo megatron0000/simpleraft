@@ -117,6 +117,8 @@ func (rulehandler *RuleHandler) LeaderOnRemoveServer(msg iface.MsgRemoveServer, 
 }
 func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0)
+	//Reset timer for next timeout
+	actions = append(actions, iface.ActionResetTimer{HalfTime: true})
 	for _, address := range status.PeerAddresses() {
 		entries := make([]iface.LogEntry, 0)
 		if log.LastIndex() >= status.NextIndex(address) {
