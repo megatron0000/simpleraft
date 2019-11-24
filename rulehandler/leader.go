@@ -1,6 +1,7 @@
 package rulehandler
 
 import (
+	"math"
 	"simpleraft/iface"
 )
 
@@ -48,50 +49,6 @@ func (rulehandler *RuleHandler) LeaderOnAppendEntries(msg iface.MsgAppendEntries
 			NewState: iface.StateFollower})
 		actions = append(actions, iface.ActionReprocess{})
 	}
-	/*
-		//Reply false if term < currentTerm (§5.1)
-		if msg.Term < status.CurrentTerm() {
-			actions = append(actions, iface.ReplyAppendEntries{
-				Term:    status.CurrentTerm(),
-				Success: false})
-			return actions
-		}
-		//Reply false if log doesn’t contain an entry at prevLogIndex
-		//whose term matches prevLogTerm (§5.3)
-		prevLog, _ := log.Get(msg.PrevLogIndex)
-		if prevLog == nil || msg.PrevLogTerm != prevLog.Term {
-			actions = append(actions, iface.ReplyAppendEntries{
-				Term:    status.CurrentTerm(),
-				Success: false})
-			return actions
-		}
-		//If an existing entry conflicts with a new one (same index
-		//but different terms), delete the existing entry and all that
-		//follow it (§5.3)
-		nextLogIndex := msg.PrevLogIndex
-		var nextLog *iface.LogEntry
-		for _, entry := range msg.Entries {
-			nextLogIndex++
-			nextLog, _ = log.Get(nextLogIndex)
-			if nextLog == nil || entry.Term != nextLog.Term {
-				actions = append(actions, iface.ActionDeleteLog{
-					Count: log.LastIndex() - nextLogIndex + 1})
-				break
-			}
-		}
-		//Append any new entries not already in the log
-		nextLogIndex := msg.PrevLogIndex
-		for indx, entry := range msg.Entries {
-			nextLogIndex++
-			if log.LastIndex() < nextLogIndex {
-				actions = append(actions, iface.ActionAppendLog{
-					Entries: msg.Entries[:]})
-				break
-			}
-			nextLogIndex++
-			nextLog, _ = log.Get(nextLogIndex)
-		}*/
-
 	return actions
 }
 func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
@@ -186,6 +143,39 @@ func (rulehandler *RuleHandler) LeaderOnAppendEntriesReply(msg iface.MsgAppendEn
 		actions = append(actions, iface.ActionSetMatchIndex{
 			Peer:          msg.Address,
 			NewMatchIndex: log.LastIndex()})
+		//If there exists an N such that N > commitIndex, a majority
+		//of matchIndex[i] ≥ N, and log[N].term == currentTerm:
+		//set commitIndex = N (§5.3, §5.4).
+		majority := math.Ceil(float64(len(status.PeerAddresses())) / 2)
+		newCommitIndex := status.CommitIndex()
+		for N, change := newCommitIndex+1, true; change; N++ {
+			change = false
+			count := 0
+			for _, address := range status.PeerAddresses() {
+				if status.MatchIndex(address) >= N {
+					count++
+				}
+			}
+			lastLog, _ := log.Get(N)
+			if lastLog != nil {
+				if float64(count) >= majority && lastLog.Term == status.CurrentTerm() {
+					newCommitIndex = N
+					change = true
+				}
+			}
+		}
+		if newCommitIndex > status.CommitIndex() {
+			actions = append(actions, iface.ActionSetCommitIndex{NewCommitIndex: newCommitIndex})
+		}
+
+		//If commitIndex > lastApplied: increment lastApplied, apply
+		//log[lastApplied] to state machine (§5.3)
+
+		for i := status.LastApplied() + 1; i <= newCommitIndex; i++ {
+			actions = append(actions, iface.ActionSetLastApplied{NewLastApplied: i})
+			actions = append(actions, iface.ActionStateMachineApply{EntryIndex: i})
+		}
+
 	} else {
 		//If AppendEntries fails because of log inconsistency:
 		//decrement nextIndex and retry (§5.3)
