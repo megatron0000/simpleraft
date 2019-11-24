@@ -1,190 +1,200 @@
 <div>
-  <form class="form-horizontal" ng-controller="StatusController">
-    <div class="form-group">
-      <label for="executorRunning" class="col-sm-3 control-label">Raft is running ?</label>
-      <div class="col-sm-7">
-        <input bs-switch ng-change="setExecutorIsRunning()" id="executorRunning" type="checkbox"
-          ng-model="executorRunning" />
-      </div>
-    </div>
+  <div ng-controller="StatusController"
+    ng-class="{'background-off': !executorRunning, 'background-on': executorRunning}" class="clearfix">
 
-    <div class="form-group">
-      <label for="inputState" class="col-sm-3 control-label">State</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="text" class="form-control" id="inputState" ng-model="nodeState">
-          <a ng-disabled="waitingResponse || nodeStateInvalid(nodeState)" class="input-group-addon input"
-            ng-click="!waitingResponse && !nodeStateInvalid(nodeState) && setNodeState(nodeState)">{{waitingResponse ? "..." : "Save"}}</a>
+    <form class="form-horizontal col-sm-6">
+      <div class="form-group">
+        <label for="executorRunning" class="col-sm-3 control-label">Raft is running ?</label>
+        <div class="col-sm-7">
+          <input bs-switch ng-change="setExecutorIsRunning()" id="executorRunning" type="checkbox"
+            ng-model="executorRunning" />
         </div>
-        <span ng-show="nodeStateInvalid(nodeState)">Must be one of "follower", "candidate", "leader"</span>
       </div>
-    </div>
 
-
-    <div class="form-group">
-      <label for="inputNodeAddress" class="col-sm-3 control-label">Node Address</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="text" class="form-control" id="inputNodeAddress" ng-model="nodeAddress">
-          <a ng-disabled="waitingResponse || nodeAddressInvalid(nodeAddress)" class="input-group-addon input"
-            ng-click="!waitingResponse && !nodeAddressInvalid(nodeAddress) && setNodeAddress(nodeAddress)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputState" class="col-sm-3 control-label">State</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="text" class="form-control" id="inputState" ng-model="nodeState">
+            <a ng-disabled="waitingResponse || nodeStateInvalid(nodeState)" class="input-group-addon input"
+              ng-click="!waitingResponse && !nodeStateInvalid(nodeState) && setNodeState(nodeState)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="nodeStateInvalid(nodeState)">Must be one of "follower", "candidate", "leader"</span>
         </div>
-        <span ng-show="nodeAddressInvalid(nodeAddress)">Must be a valid network address (like "localhost:10001")</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputCurrentTerm" class="col-sm-3 control-label">Current Term</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="number" class="form-control" id="inputCurrentTerm" ng-model="currentTerm">
-          <a ng-disabled="waitingResponse || currentTermInvalid(currentTerm)" class="input-group-addon input"
-            ng-click="!waitingResponse && !currentTermInvalid(currentTerm) && setCurrentTerm(currentTerm)">{{waitingResponse ? "..." : "Save"}}</a>
+
+      <div class="form-group">
+        <label for="inputNodeAddress" class="col-sm-3 control-label">Node Address</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="text" class="form-control" id="inputNodeAddress" ng-model="nodeAddress">
+            <a ng-disabled="waitingResponse || nodeAddressInvalid(nodeAddress)" class="input-group-addon input"
+              ng-click="!waitingResponse && !nodeAddressInvalid(nodeAddress) && setNodeAddress(nodeAddress)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="nodeAddressInvalid(nodeAddress)">Must be a valid network address (like
+            "localhost:10001")</span>
         </div>
-        <span ng-show="currentTermInvalid(currentTerm)">Must be integer >= 0</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputVotedFor" class="col-sm-3 control-label">Voted For</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="text" class="form-control" id="inputVotedFor" ng-model="votedFor" placeholder="empty">
-          <a ng-disabled="waitingResponse || votedForInvalid(votedFor)" class="input-group-addon input"
-            ng-click="!waitingResponse && !votedForInvalid(votedFor) && setVotedFor(votedFor)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputCurrentTerm" class="col-sm-3 control-label">Current Term</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputCurrentTerm" ng-model="currentTerm">
+            <a ng-disabled="waitingResponse || currentTermInvalid(currentTerm)" class="input-group-addon input"
+              ng-click="!waitingResponse && !currentTermInvalid(currentTerm) && setCurrentTerm(currentTerm)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="currentTermInvalid(currentTerm)">Must be integer >= 0</span>
         </div>
-        <span ng-show="votedForInvalid(votedFor)">Must be either the empty string ("") or a valid network address</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputVoteCount" class="col-sm-3 control-label">Vote Count</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="number" class="form-control" id="inputVoteCount" ng-model="voteCount">
-          <a ng-disabled="waitingResponse || voteCountInvalid(voteCount)" class="input-group-addon input"
-            ng-click="!waitingResponse && !voteCountInvalid(voteCount) && setVoteCount(voteCount)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputVotedFor" class="col-sm-3 control-label">Voted For</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="text" class="form-control" id="inputVotedFor" ng-model="votedFor" placeholder="empty">
+            <a ng-disabled="waitingResponse || votedForInvalid(votedFor)" class="input-group-addon input"
+              ng-click="!waitingResponse && !votedForInvalid(votedFor) && setVotedFor(votedFor)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="votedForInvalid(votedFor)">Must be either the empty string ("") or a valid network
+            address</span>
         </div>
-        <span ng-show="voteCountInvalid(voteCount)">Must be integer >= 0</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputCommitIndex" class="col-sm-3 control-label">Commit Index</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="number" class="form-control" id="inputCommitIndex" ng-model="commitIndex">
-          <a ng-disabled="waitingResponse || commitIndexInvalid(commitIndex)" class="input-group-addon input"
-            ng-click="!waitingResponse && !commitIndexInvalid(commitIndex) && setCommitIndex(commitIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputVoteCount" class="col-sm-3 control-label">Vote Count</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputVoteCount" ng-model="voteCount">
+            <a ng-disabled="waitingResponse || voteCountInvalid(voteCount)" class="input-group-addon input"
+              ng-click="!waitingResponse && !voteCountInvalid(voteCount) && setVoteCount(voteCount)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="voteCountInvalid(voteCount)">Must be integer >= 0</span>
         </div>
-        <span ng-show="commitIndexInvalid(commitIndex)">Must be integer >= -1</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputLastApplied" class="col-sm-3 control-label">Last Applied</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="number" class="form-control" id="inputLastApplied" ng-model="lastApplied">
-          <a ng-disabled="waitingResponse || lastAppliedInvalid(lastApplied)" class="input-group-addon input"
-            ng-click="!waitingResponse && !lastAppliedInvalid(lastApplied) && setLastApplied(lastApplied)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputCommitIndex" class="col-sm-3 control-label">Commit Index</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputCommitIndex" ng-model="commitIndex">
+            <a ng-disabled="waitingResponse || commitIndexInvalid(commitIndex)" class="input-group-addon input"
+              ng-click="!waitingResponse && !commitIndexInvalid(commitIndex) && setCommitIndex(commitIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="commitIndexInvalid(commitIndex)">Must be integer >= -1</span>
         </div>
-        <span ng-show="lastAppliedInvalid(lastApplied)">Must be integer >= -1</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputPeerAddresses" class="col-sm-3 control-label">Peer Addresses<br>(separated by ",")</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <textarea rows="6" class="form-control" id="inputPeerAddresses" ng-model="peerAddresses" ng-list></textarea>
-          <a ng-disabled="waitingResponse || peerAddressesInvalid(peerAddresses)" class="input-group-addon input"
-            ng-click="!waitingResponse && !peerAddressesInvalid(peerAddresses) && setPeerAddresses(peerAddresses)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputLastApplied" class="col-sm-3 control-label">Last Applied</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputLastApplied" ng-model="lastApplied">
+            <a ng-disabled="waitingResponse || lastAppliedInvalid(lastApplied)" class="input-group-addon input"
+              ng-click="!waitingResponse && !lastAppliedInvalid(lastApplied) && setLastApplied(lastApplied)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="lastAppliedInvalid(lastApplied)">Must be integer >= -1</span>
         </div>
-        <span ng-show="peerAddressesInvalid(peerAddresses)">Must be a list of valid network addresses separated by
-          ","</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label class="col-sm-3 control-label">Next Index</label>
-      <div class="col-sm-7">
-        <div class="form-horizontal">
-          <div class="form-group" ng-repeat="peer in nextIndexes track by $index">
-            <label class="col-sm-5 control-label">{{peer.PeerAddress}}</label>
-            <div class="col-sm-7">
-              <div class="input-group">
-                <input type="number" class="form-control" ng-model="peer.NextIndex">
-                <a ng-disabled="waitingResponse || nextIndexInvalid(peer.NextIndex)" class="input-group-addon input"
-                  ng-click="!waitingResponse && !nextIndexInvalid(peer.NextIndex) && setNextIndex(peer.PeerAddress, peer.NextIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputPeerAddresses" class="col-sm-3 control-label">Peer Addresses<br>(separated by ",")</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <textarea rows="6" class="form-control" id="inputPeerAddresses" ng-model="peerAddresses" ng-list></textarea>
+            <a ng-disabled="waitingResponse || peerAddressesInvalid(peerAddresses)" class="input-group-addon input"
+              ng-click="!waitingResponse && !peerAddressesInvalid(peerAddresses) && setPeerAddresses(peerAddresses)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="peerAddressesInvalid(peerAddresses)">Must be a list of valid network addresses separated by
+            ","</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Next Index</label>
+        <div class="col-sm-7">
+          <div class="form-horizontal">
+            <div class="form-group" ng-repeat="peer in nextIndexes track by $index">
+              <label class="col-sm-5 control-label">{{peer.PeerAddress}}</label>
+              <div class="col-sm-7">
+                <div class="input-group">
+                  <input type="number" class="form-control" ng-model="peer.NextIndex">
+                  <a ng-disabled="waitingResponse || nextIndexInvalid(peer.NextIndex)" class="input-group-addon input"
+                    ng-click="!waitingResponse && !nextIndexInvalid(peer.NextIndex) && setNextIndex(peer.PeerAddress, peer.NextIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+                </div>
+                <span ng-show="nextIndexInvalid(peer.NextIndex)">Must be integer >= 0</span>
               </div>
-              <span ng-show="nextIndexInvalid(peer.NextIndex)">Must be integer >= 0</span>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label class="col-sm-3 control-label">Match Index</label>
-      <div class="col-sm-7">
-        <div class="form-horizontal">
-          <div class="form-group" ng-repeat="peer in matchIndexes track by $index">
-            <label class="col-sm-5 control-label">{{peer.PeerAddress}}</label>
-            <div class="col-sm-7">
-              <div class="input-group">
-                <input type="number" class="form-control" ng-model="peer.MatchIndex">
-                <a ng-disabled="waitingResponse || matchIndexInvalid(peer.MatchIndex)" class="input-group-addon input"
-                  ng-click="!waitingResponse && !matchIndexInvalid(peer.MatchIndex) && setMatchIndex(peer.PeerAddress, peer.MatchIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Match Index</label>
+        <div class="col-sm-7">
+          <div class="form-horizontal">
+            <div class="form-group" ng-repeat="peer in matchIndexes track by $index">
+              <label class="col-sm-5 control-label">{{peer.PeerAddress}}</label>
+              <div class="col-sm-7">
+                <div class="input-group">
+                  <input type="number" class="form-control" ng-model="peer.MatchIndex">
+                  <a ng-disabled="waitingResponse || matchIndexInvalid(peer.MatchIndex)" class="input-group-addon input"
+                    ng-click="!waitingResponse && !matchIndexInvalid(peer.MatchIndex) && setMatchIndex(peer.PeerAddress, peer.MatchIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+                </div>
+                <span ng-show="matchIndexInvalid(peer.MatchIndex)">Must be integer >= -1</span>
               </div>
-              <span ng-show="matchIndexInvalid(peer.MatchIndex)">Must be integer >= -1</span>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputClusterChangeIndex" class="col-sm-3 control-label">Cluster Change Index</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="number" class="form-control" id="inputClusterChangeIndex" ng-model="clusterChangeIndex">
-          <a ng-disabled="waitingResponse || clusterChangeIndexInvalid(clusterChangeIndex)"
-            class="input-group-addon input"
-            ng-click="!waitingResponse && !clusterChangeIndexInvalid(clusterChangeIndex) && setClusterChangeIndex(clusterChangeIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputClusterChangeIndex" class="col-sm-3 control-label">Cluster Change Index</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputClusterChangeIndex" ng-model="clusterChangeIndex">
+            <a ng-disabled="waitingResponse || clusterChangeIndexInvalid(clusterChangeIndex)"
+              class="input-group-addon input"
+              ng-click="!waitingResponse && !clusterChangeIndexInvalid(clusterChangeIndex) && setClusterChangeIndex(clusterChangeIndex)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="clusterChangeIndexInvalid(clusterChangeIndex)">Must be integer >= -1</span>
         </div>
-        <span ng-show="clusterChangeIndexInvalid(clusterChangeIndex)">Must be integer >= -1</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label for="inputClusterChangeTerm" class="col-sm-3 control-label">Cluster Change Term</label>
-      <div class="col-sm-7">
-        <div class="input-group">
-          <input type="number" class="form-control" id="inputClusterChangeTerm" ng-model="clusterChangeTerm">
-          <a ng-disabled="waitingResponse || clusterChangeTermInvalid(clusterChangeTerm)"
-            class="input-group-addon input"
-            ng-click="!waitingResponse && !clusterChangeTermInvalid(clusterChangeTerm) && setClusterChangeTerm(clusterChangeTerm)">{{waitingResponse ? "..." : "Save"}}</a>
+      <div class="form-group">
+        <label for="inputClusterChangeTerm" class="col-sm-3 control-label">Cluster Change Term</label>
+        <div class="col-sm-7">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputClusterChangeTerm" ng-model="clusterChangeTerm">
+            <a ng-disabled="waitingResponse || clusterChangeTermInvalid(clusterChangeTerm)"
+              class="input-group-addon input"
+              ng-click="!waitingResponse && !clusterChangeTermInvalid(clusterChangeTerm) && setClusterChangeTerm(clusterChangeTerm)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span ng-show="clusterChangeTermInvalid(clusterChangeTerm)">Must be integer >= -1</span>
         </div>
-        <span ng-show="clusterChangeTermInvalid(clusterChangeTerm)">Must be integer >= -1</span>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label class="col-sm-3 control-label">Log Entries</label>
-      <div class="col-sm-7">
-        <div class="form-horizontal">
-          <div class="form-group" ng-repeat="(index, entry) in logs track by $index">
-            <label class="col-sm-3 control-label">Index {{index}}</label>
-            <div class="col-sm-9">
-              <textarea rows="6" class="form-control" ng-model="entry" json-print="entry"></textarea>
+
+
+    </form>
+
+    <form class="form-horizontal col-sm-6">
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Log Entries</label>
+        <div class="col-sm-7">
+          <div class="form-horizontal">
+            <div class="form-group" ng-repeat="(index, entry) in logs track by $index">
+              <label class="col-sm-3 control-label">Index {{index}}</label>
+              <div class="col-sm-9">
+                <textarea rows="6" class="form-control" ng-model="entry" json-print="entry"></textarea>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </form>
 
-
-  </form>
+  </div>
 
 </div>

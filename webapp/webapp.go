@@ -28,7 +28,7 @@ func New(exec *executor.Executor, port string, wwwDir string) *RaftWebApp {
 
 // Start activates the backend server. This is a blocking function
 func (app *RaftWebApp) Start() {
-	fmt.Println("webapp: starting")
+	fmt.Printf("webapp: starting at port %s\n", app.port)
 	app.executor.Stop()
 	executorIsRunning := false
 
