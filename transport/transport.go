@@ -2,10 +2,10 @@ package transport
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"fmt"
 	"strings"
 )
 
@@ -13,6 +13,7 @@ import (
 type Transport struct {
 	receiver chan IncomingMessage
 	server   *http.Server
+	address  string
 }
 
 type handler struct {
@@ -54,7 +55,7 @@ func New(address string) *Transport {
 		Addr:    address,
 		Handler: &handler,
 	}
-	t := &Transport{receiver: make(chan IncomingMessage), server: server}
+	t := &Transport{receiver: make(chan IncomingMessage), server: server, address: address}
 	handler.transport = t
 
 	return t
@@ -63,6 +64,25 @@ func New(address string) *Transport {
 // Listen activates the transport service
 func (transport *Transport) Listen() {
 	go transport.server.ListenAndServe()
+}
+
+// Close immediately stops Listen()
+// TODO: test this function
+func (transport *Transport) Close() {
+	transport.server.Close()
+	handler := &handler{}
+	transport.server = &http.Server{
+		Addr:    transport.address,
+		Handler: handler,
+	}
+	handler.transport = transport
+}
+
+// ChangeAddress changes the internet address where the
+// transport service will listen. This change will take
+// effect only when the transport service is restarted
+func (transport *Transport) ChangeAddress(newAddress string) {
+	transport.address = newAddress
 }
 
 // Send sends a message to `address` and returns a channel from
