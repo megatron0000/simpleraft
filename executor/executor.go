@@ -33,7 +33,6 @@ type Executor struct {
 	// results may issue
 	minElectionTimeout int
 	maxElectionTimeout int
-	broadcastInterval  int
 
 	timer *time.Timer
 	// buffered channel (when a peer answer one of our AppendEntries, this channel
@@ -42,6 +41,10 @@ type Executor struct {
 	// buffered channel (when a peer answer one of our RequestVote, this channel
 	// will receive the response)
 	requestVoteReplyChan chan iface.MsgRequestVoteReply
+
+	// internal channels to implement Stop() method
+	stop    chan bool
+	stopped chan bool
 }
 
 // New instantiates a configured Executor instance but DOES NOT initiate it.
@@ -58,9 +61,8 @@ func New(
 	nodeAddress iface.PeerAddress,
 	peerAddresses []iface.PeerAddress,
 	storageFilePath string,
-	minElectionTimeout,
-	maxElectionTimeout,
-	broadcastInterval int,
+	minElectionTimeout int,
+	maxElectionTimeout int,
 	handlerImplementation iface.RuleHandler,
 	stateMachineImplementation iface.StateMachine) (*Executor, error) {
 
@@ -102,10 +104,11 @@ func New(
 		stateMachine:           stateMachineImplementation,
 		minElectionTimeout:     minElectionTimeout,
 		maxElectionTimeout:     maxElectionTimeout,
-		broadcastInterval:      broadcastInterval,
 		timer:                  timer,
 		appendEntriesReplyChan: make(chan iface.MsgAppendEntriesReply, 1000),
 		requestVoteReplyChan:   make(chan iface.MsgRequestVoteReply, 1000),
+		stop:                   nil,
+		stopped:                make(chan bool),
 	}
 
 	return executor, nil
@@ -118,8 +121,14 @@ func (executor *Executor) TearDown() {
 }
 
 // Run executes the raft protocol loop. This is a blocking function
-// (it does NOT create another goroutine for the loop)
+// (it does NOT create another goroutine for the loop).
 func (executor *Executor) Run() {
+
+	if executor.stop != nil {
+		panic("executor: called Run() but was already running")
+	}
+
+	executor.stop = make(chan bool)
 
 	var (
 		actions []interface{}
@@ -152,9 +161,25 @@ func (executor *Executor) Run() {
 			actions = executor.forwardReply(msg)
 			executor.implementActions(actions, nil, msg)
 
+		case <-executor.stop:
+			executor.transport.Close()
+			executor.stop = nil
+			executor.stopped <- true
+			return
+
 		}
 	}
 
+}
+
+// Stop stops the execution of Run(). It is idempotent
+// and safe to call even if Run() actually is not
+// being executed
+func (executor *Executor) Stop() {
+	if executor.stop != nil {
+		executor.stop <- true
+		<-executor.stopped
+	}
 }
 
 func (executor *Executor) randomElectionTimeout() time.Duration {
@@ -179,13 +204,13 @@ func (executor *Executor) forwardIncoming(msg transport.IncomingMessage) []inter
 		err                 error
 	)
 
-	fmt.Printf("forwarding (%T)%+v to handler \n", msg, struct {
+	fmt.Printf("forwarding (%T)%+v to %s handler \n\n", msg, struct {
 		Endpoint string
 		Data     string
 	}{
 		Endpoint: msg.Endpoint,
 		Data:     string(msg.Data),
-	})
+	}, executor.status.State())
 
 	switch msg.Endpoint {
 	case "/appendEntries":
@@ -335,7 +360,7 @@ func (executor *Executor) forwardReply(reply interface{}) []interface{} {
 		actions []interface{}
 	)
 
-	fmt.Printf("forwarding (%T)%+v to handler \n", reply, reply)
+	fmt.Printf("forwarding (%T)%+v to %s handler \n\n", reply, reply, executor.status.State())
 
 	switch res := reply.(type) {
 	case iface.MsgAppendEntriesReply:
@@ -398,7 +423,7 @@ func (executor *Executor) forwardTick() []interface{} {
 		actions []interface{}
 	)
 
-	fmt.Printf("forwarding timeout to handler \n")
+	fmt.Printf("forwarding timeout to %s handler \n\n", executor.status.State())
 
 	switch executor.status.State() {
 	case iface.StateFollower:
@@ -434,7 +459,7 @@ func (executor *Executor) forwardStateChanged() []interface{} {
 		actions []interface{}
 	)
 
-	fmt.Printf("forwarding state change (to %s) to handler \n", executor.status.State())
+	fmt.Printf("forwarding state change (to %s) to handler \n\n", executor.status.State())
 
 	msg := iface.MsgStateChanged{}
 	switch executor.status.State() {
@@ -481,6 +506,7 @@ func (executor *Executor) implementActions(
 	for _, untypedAction := range actions {
 		fmt.Printf("\t(%T)%+v\n", untypedAction, untypedAction)
 	}
+	fmt.Println("")
 
 	for _, untypedAction := range actions {
 		switch action := untypedAction.(type) {
