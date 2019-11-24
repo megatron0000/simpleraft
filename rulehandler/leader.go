@@ -7,6 +7,7 @@ import (
 func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, log iface.RaftLog, status iface.Status) []interface{} {
 	//Slice to be returned
 	actions := make([]interface{}, 0)
+
 	firstEntry := iface.LogEntry{
 		Term:    status.CurrentTerm(),
 		Kind:    iface.EntryNoOp,
@@ -34,6 +35,8 @@ func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, 
 			PrevLogIndex: log.LastIndex(),
 			PrevLogTerm:  firstEntry.Term})
 	}
+	//Reset timer for next timeout
+	actions = append(actions, iface.ActionResetTimer{HalfTime: true})
 	return actions
 }
 func (rulehandler *RuleHandler) LeaderOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
@@ -117,6 +120,8 @@ func (rulehandler *RuleHandler) LeaderOnRemoveServer(msg iface.MsgRemoveServer, 
 }
 func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0)
+	//Reset timer for next timeout
+	actions = append(actions, iface.ActionResetTimer{HalfTime: true})
 	for _, address := range status.PeerAddresses() {
 		entries := make([]iface.LogEntry, 0)
 		if log.LastIndex() >= status.NextIndex(address) {
