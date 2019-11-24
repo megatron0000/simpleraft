@@ -1,10 +1,20 @@
 package storage
 
 import (
+	"io"
 	"os"
 
+	"github.com/juju/fslock"
 	"modernc.org/kv"
 )
+
+type filelocker struct {
+	lock *fslock.Lock
+}
+
+func (lock *filelocker) Close() error {
+	return lock.lock.Unlock()
+}
 
 // helper
 func exists(name string) (bool, error) {
@@ -48,10 +58,22 @@ func New(name string) (storage *Storage, err error) {
 		return nil, err
 	}
 
+	options := &kv.Options{
+		Locker: func(name string) (io.Closer, error) {
+			locker := filelocker{}
+			locker.lock = fslock.New(name)
+			err := locker.lock.TryLock()
+			if err != nil {
+				return nil, err
+			}
+			return &locker, nil
+		},
+	}
+
 	if exist {
-		db, err = kv.Open(name, &kv.Options{})
+		db, err = kv.Open(name, options)
 	} else {
-		db, err = kv.Create(name, &kv.Options{})
+		db, err = kv.Create(name, options)
 	}
 
 	if err != nil {
