@@ -1,0 +1,93 @@
+<!DOCTYPE HTML>
+<html lang="en" ng-app='App'>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=egde" />
+  <title>AngularJS App</title>
+
+  <!-- LIBRARIES -->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.slim.min.js'></script>
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"
+    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <script src="https://code.angularjs.org/1.7.8/angular.min.js"></script>
+  <script src="https://code.angularjs.org/1.7.8/angular-route.min.js"></script>
+  <script src="https://code.angularjs.org/1.7.8/angular-resource.min.js"></script>
+  <script src="https://code.angularjs.org/1.7.8/angular-sanitize.min.js"></script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.0/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@1.4.0/socket.io.js"></script>
+  <!-- Bootstrap 4 requires Popper.js -->
+  <script src="https://unpkg.com/popper.js@1.14.1/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+  <script src="http://vjs.zencdn.net/6.6.3/video.js"></script>
+  <script src="view/js/flat-ui.js"></script>
+  <script src="./view/js/angular-bootstrap-switch.js"></script>
+
+  <!-- STYLE / THEME -->
+  <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/flat-ui/2.3.0/css/flat-ui.min.css" rel="stylesheet">
+  <link href="view/css/style.css" rel="stylesheet">
+
+  <!-- THIS APP. -->
+  <script src="controller/services.js"></script>
+  <script src="controller/directives.js"></script>
+  <script src="controller/filters.js"></script>
+  <script src="controller/controllers.js"></script>
+  <script src="App.js"></script>
+</head>
+
+<body class="container">
+  <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container-fluid">
+      <!-- Brand and toggle get grouped for better mobile display -->
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+          data-target="#bs-example-navbar-collapse-1">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+      </div>
+
+      <!-- Collect the nav links, forms, and other content for toggling -->
+      <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+        <ul class="nav navbar-nav">
+          <li class="active"><a href="#!/view1">Monitor</a></li>
+        </ul>
+      </div><!-- /.navbar-collapse -->
+    </div><!-- /.container-fluid -->
+  </nav>
+
+  <div class="container-fluid">
+    <div class="row-fluid">
+      <div class="col-sm-2">
+
+      </div>
+      <!--/span-->
+      <div class="col-sm-12">
+        <div class="jumbotron">
+          <h1>simpleraft node monitor</h1>
+          <p>
+            You can view node state in realtime. If you click on "save", the node will be STOPPED before
+            changes take place
+          </p>
+        </div>
+
+
+        <div class="row-fluid" ng-view>
+          <!-- VIEWS -->
+        </div>
+
+      </div>
+      <!--/span-->
+    </div>
+    <!--/row-->
+
+  </div>
+  <!--/.fluid-container-->
+
+
+</body>
+
+</html>

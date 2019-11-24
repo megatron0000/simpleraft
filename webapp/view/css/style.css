@@ -1,0 +1,8 @@
+a.input:hover {
+  cursor: pointer;
+}
+
+a.input[disabled] {
+  cursor: not-allowed;
+}
+
