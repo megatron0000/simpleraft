@@ -2,9 +2,8 @@ package executor
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
-	"os"
-	"os/signal"
 	"simpleraft/iface"
 	"simpleraft/raftlog"
 	"simpleraft/status"
@@ -37,12 +36,12 @@ type Executor struct {
 	broadcastInterval  int
 
 	timer *time.Timer
-	// unbuffered channel
-	stateChangedChan chan bool
-	// buffered channel
-	appendEntriesReplyChan chan iface.ReplyAppendEntries
-	// buffered channel
-	requestVoteReplyChan chan iface.ReplyDecidedVote
+	// buffered channel (when a peer answer one of our AppendEntries, this channel
+	// will receive the response)
+	appendEntriesReplyChan chan iface.MsgAppendEntriesReply
+	// buffered channel (when a peer answer one of our RequestVote, this channel
+	// will receive the response)
+	requestVoteReplyChan chan iface.MsgRequestVoteReply
 }
 
 // New instantiates a configured Executor instance but DOES NOT initiate it.
@@ -105,20 +104,9 @@ func New(
 		maxElectionTimeout:     maxElectionTimeout,
 		broadcastInterval:      broadcastInterval,
 		timer:                  timer,
-		stateChangedChan:       make(chan bool),
-		appendEntriesReplyChan: make(chan iface.ReplyAppendEntries, 1000),
-		requestVoteReplyChan:   make(chan iface.ReplyDecidedVote, 1000),
+		appendEntriesReplyChan: make(chan iface.MsgAppendEntriesReply, 1000),
+		requestVoteReplyChan:   make(chan iface.MsgRequestVoteReply, 1000),
 	}
-
-	go func() {
-		c := make(chan os.Signal)
-		signal.Notify(c, os.Interrupt)
-		select {
-		case <-c:
-			executor.TearDown()
-			os.Exit(0)
-		}
-	}()
 
 	return executor, nil
 }
@@ -138,59 +126,35 @@ func (executor *Executor) Run() {
 	)
 
 	executor.transport.Listen()
-	executor.timer.Reset(executor.randomElectionTimeout())
 
+	// trigger first event change (actually, not a change
+	// since there was no prior state in the first place )
+	actions = executor.forwardStateChanged()
+	executor.implementActions(actions, nil, iface.MsgStateChanged{})
+
+	// loop listening for (and reacting to) events
 	for {
 
-		// non-blocking select event
 		select {
 		case msg := <-executor.transport.ReceiverChan():
 			actions = executor.forwardIncoming(msg)
-			executor.implementActions(actions, msg.ReplyChan)
+			executor.implementActions(actions, msg.ReplyChan, msg)
 
 		case <-executor.timer.C:
 			actions = executor.forwardTick()
-			executor.implementActions(actions, nil)
+			executor.implementActions(actions, nil, nil)
 
-		case <-executor.appendEntriesReplyChan:
+		case msg := <-executor.appendEntriesReplyChan:
+			actions = executor.forwardReply(msg)
+			executor.implementActions(actions, nil, msg)
 
-		case <-executor.requestVoteReplyChan:
+		case msg := <-executor.requestVoteReplyChan:
+			actions = executor.forwardReply(msg)
+			executor.implementActions(actions, nil, msg)
 
-		default:
 		}
-
-		// non-blocking check if handler decided to change state
-		// (by now, the state will already have been changed)
-		select {
-
-		case <-executor.stateChangedChan:
-			switch executor.status.State() {
-
-			case iface.StateFollower:
-				actions = executor.handler.FollowerOnStateChanged(
-					iface.MsgStateChanged{},
-					executor.log,
-					executor.status)
-
-			case iface.StateCandidate:
-				actions = executor.handler.CandidateOnStateChanged(
-					iface.MsgStateChanged{},
-					executor.log,
-					executor.status)
-
-			case iface.StateLeader:
-				actions = executor.handler.LeaderOnStateChanged(
-					iface.MsgStateChanged{},
-					executor.log,
-					executor.status)
-			}
-
-			executor.implementActions(actions, nil)
-
-		default:
-		}
-
 	}
+
 }
 
 func (executor *Executor) randomElectionTimeout() time.Duration {
@@ -214,6 +178,14 @@ func (executor *Executor) forwardIncoming(msg transport.IncomingMessage) []inter
 		actions             []interface{}
 		err                 error
 	)
+
+	fmt.Printf("forwarding (%T)%+v to handler \n", msg, struct {
+		Endpoint string
+		Data     string
+	}{
+		Endpoint: msg.Endpoint,
+		Data:     string(msg.Data),
+	})
 
 	switch msg.Endpoint {
 	case "/appendEntries":
@@ -350,9 +322,69 @@ func (executor *Executor) forwardIncoming(msg transport.IncomingMessage) []inter
 		panic("unknown endpoint: " + msg.Endpoint)
 	}
 
-	// make sure something is sent as response, even if RuleHandler did not
-	// respond
-	msg.ReplyChan <- []byte("Empty response")
+	return actions
+}
+
+// forwardReply forwards either a MsgAppendEntriesReply or a
+// MsgRequestVoteReply (received from a peer) to the rule handler.
+//
+// Returns the list of actions (as received from handler)
+func (executor *Executor) forwardReply(reply interface{}) []interface{} {
+
+	var (
+		actions []interface{}
+	)
+
+	fmt.Printf("forwarding (%T)%+v to handler \n", reply, reply)
+
+	switch res := reply.(type) {
+	case iface.MsgAppendEntriesReply:
+		switch executor.status.State() {
+		case iface.StateFollower:
+			actions = executor.handler.FollowerOnAppendEntriesReply(
+				res,
+				executor.log,
+				executor.status)
+
+		case iface.StateCandidate:
+			actions = executor.handler.CandidateOnAppendEntriesReply(
+				res,
+				executor.log,
+				executor.status)
+
+		case iface.StateLeader:
+			actions = executor.handler.LeaderOnAppendEntriesReply(
+				res,
+				executor.log,
+				executor.status)
+
+		}
+
+	case iface.MsgRequestVoteReply:
+		switch executor.status.State() {
+		case iface.StateFollower:
+			actions = executor.handler.FollowerOnRequestVoteReply(
+				res,
+				executor.log,
+				executor.status)
+
+		case iface.StateCandidate:
+			actions = executor.handler.CandidateOnRequestVoteReply(
+				res,
+				executor.log,
+				executor.status)
+
+		case iface.StateLeader:
+			actions = executor.handler.LeaderOnRequestVoteReply(
+				res,
+				executor.log,
+				executor.status)
+
+		}
+
+	default:
+		panic("unknown reply type")
+	}
 
 	return actions
 }
@@ -365,6 +397,8 @@ func (executor *Executor) forwardTick() []interface{} {
 	var (
 		actions []interface{}
 	)
+
+	fmt.Printf("forwarding timeout to handler \n")
 
 	switch executor.status.State() {
 	case iface.StateFollower:
@@ -390,15 +424,63 @@ func (executor *Executor) forwardTick() []interface{} {
 	return actions
 }
 
-// implementActions executes the actions specified by rule handler
+// forwardStateChanged forwards a notice that state has changed
+// to the rule handler
 //
-// replyChan may be nil
-func (executor *Executor) implementActions(actions []interface{}, replyChan chan []byte) {
+// Returns the list of actions (as received from handler)
+func (executor *Executor) forwardStateChanged() []interface{} {
 
 	var (
-		marshal []byte
-		err     error
+		actions []interface{}
 	)
+
+	fmt.Printf("forwarding state change (to %s) to handler \n", executor.status.State())
+
+	msg := iface.MsgStateChanged{}
+	switch executor.status.State() {
+	case iface.StateFollower:
+		actions = executor.handler.FollowerOnStateChanged(
+			msg,
+			executor.log,
+			executor.status)
+
+	case iface.StateCandidate:
+		actions = executor.handler.CandidateOnStateChanged(
+			msg,
+			executor.log,
+			executor.status)
+
+	case iface.StateLeader:
+		actions = executor.handler.LeaderOnStateChanged(
+			msg,
+			executor.log,
+			executor.status)
+	}
+
+	return actions
+}
+
+// implementActions executes the actions specified by rule handler
+//
+// `replyChan` may be nil
+//
+// `originatingMsg` is the Msg* struct that logically
+// demanded the call to implementActions()
+func (executor *Executor) implementActions(
+	actions []interface{},
+	replyChan chan []byte,
+	originatingMsg interface{}) {
+
+	var (
+		marshal    []byte
+		subactions []interface{}
+		err        error
+	)
+
+	fmt.Printf("implementing actions:\n")
+	for _, untypedAction := range actions {
+		fmt.Printf("\t(%T)%+v\n", untypedAction, untypedAction)
+	}
 
 	for _, untypedAction := range actions {
 		switch action := untypedAction.(type) {
@@ -460,8 +542,12 @@ func (executor *Executor) implementActions(actions []interface{}, replyChan chan
 			}
 
 		case iface.ActionSetState:
+			// must execute state-change subactions
+			// before returning to the remaining actions at this level
 			executor.status.SetState(action.NewState)
-			executor.stateChangedChan <- true
+			msg := iface.MsgStateChanged{}
+			subactions = executor.forwardStateChanged()
+			executor.implementActions(subactions, nil, msg)
 
 		case iface.ActionSetCurrentTerm:
 			executor.status.SetCurrentTerm(action.NewCurrentTerm)
@@ -536,11 +622,16 @@ func (executor *Executor) implementActions(actions []interface{}, replyChan chan
 				marshal)
 
 			go func() {
-				reply, ok := <-replyChan
-				if !ok {
+				reply := <-replyChan
+				// if !ok {
+				// 	fmt.Printf("!OK\n")
+				// 	return
+				// }
+				if reply == nil {
+					fmt.Printf("NULL\n")
 					return
 				}
-				unmarshal := iface.ReplyAppendEntries{}
+				unmarshal := iface.MsgAppendEntriesReply{}
 				if err := json.Unmarshal(reply, &unmarshal); err != nil {
 					return
 				}
@@ -559,19 +650,46 @@ func (executor *Executor) implementActions(actions []interface{}, replyChan chan
 				marshal)
 
 			go func() {
-				reply, ok := <-replyChan
-				if !ok {
+				reply := <-replyChan
+				if reply == nil {
+					fmt.Printf("error: received nil reply")
 					return
 				}
-				unmarshal := iface.ReplyDecidedVote{}
+				unmarshal := iface.MsgRequestVoteReply{}
 				if err := json.Unmarshal(reply, &unmarshal); err != nil {
+					fmt.Printf("error: on unmarshal %+v\n", string(reply))
 					return
 				}
 				executor.requestVoteReplyChan <- unmarshal
 			}()
 
+		case iface.ActionReprocess:
+			switch msg := originatingMsg.(type) {
+			// timer
+			case nil:
+				subactions = executor.forwardTick()
+
+			case iface.MsgStateChanged:
+				subactions = executor.forwardStateChanged()
+
+			case iface.MsgAppendEntriesReply:
+				subactions = executor.forwardReply(msg)
+
+			case iface.MsgRequestVoteReply:
+				subactions = executor.forwardReply(msg)
+
+			case transport.IncomingMessage:
+				subactions = executor.forwardIncoming(msg)
+
+			default:
+				panic("unknown action type")
+
+			}
+
+			executor.implementActions(subactions, replyChan, originatingMsg)
+
 		default:
-			panic("unexpected action type: must be one of Action* or Reply* structs")
+			panic("unknown action type: must be one of Action* or Reply* structs")
 
 		}
 
