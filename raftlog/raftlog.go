@@ -71,9 +71,7 @@ func (log *RaftLog) Append(entry iface.LogEntry) (err error) {
 		return err
 	}
 
-	if err = log.storage.BeginTransaction(); err != nil {
-		return err
-	}
+	err = log.storage.BeginTransaction()
 
 	defer func() {
 		switch err {
@@ -83,6 +81,10 @@ func (log *RaftLog) Append(entry iface.LogEntry) (err error) {
 			log.storage.Rollback()
 		}
 	}()
+
+	if err != nil {
+		return err
+	}
 
 	err = log.storage.Set(
 		[]byte("/raft/log/index="+toString(log.lastIndex+1)),
@@ -139,9 +141,8 @@ func (log *RaftLog) Remove() (err error) {
 		panic("raft log: called Remove() on an empty log")
 	}
 
-	if err = log.storage.BeginTransaction(); err != nil {
-		return err
-	}
+	err = log.storage.BeginTransaction()
+
 	defer func() {
 		switch err {
 		case nil:
@@ -150,6 +151,10 @@ func (log *RaftLog) Remove() (err error) {
 			log.storage.Rollback()
 		}
 	}()
+
+	if err != nil {
+		return err
+	}
 
 	if err = log.storage.Delete(
 		[]byte("/raft/log/index=" + toString(log.lastIndex))); err != nil {
