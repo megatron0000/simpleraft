@@ -1,19 +1,38 @@
 package storage
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"hash"
 	"io"
 	"os"
+	"path/filepath"
 
-	"github.com/juju/fslock"
+	"time"
+
+	"github.com/juju/mutex"
 	"modernc.org/kv"
 )
 
+type fakeClock struct {
+	delay time.Duration
+}
+
+func (f *fakeClock) After(time.Duration) <-chan time.Time {
+	return time.After(f.delay)
+}
+
+func (f *fakeClock) Now() time.Time {
+	return time.Now()
+}
+
 type filelocker struct {
-	lock *fslock.Lock
+	releaser mutex.Releaser
 }
 
 func (lock *filelocker) Close() error {
-	return lock.lock.Unlock()
+	lock.releaser.Release()
+	return nil
 }
 
 // helper
@@ -60,9 +79,31 @@ func New(name string) (storage *Storage, err error) {
 
 	options := &kv.Options{
 		Locker: func(name string) (io.Closer, error) {
-			locker := filelocker{}
-			locker.lock = fslock.New(name)
-			err := locker.lock.TryLock()
+			var (
+				fpath    string
+				spec     mutex.Spec
+				err      error
+				locker   filelocker
+				h        hash.Hash
+				sha1Hash string
+				releaser mutex.Releaser
+			)
+			fpath, err = filepath.Abs(name)
+			h = sha1.New()
+			sha1Hash = hex.EncodeToString(h.Sum(nil))
+			h.Write([]byte(fpath))
+			if err != nil {
+				panic(err)
+			}
+			spec = mutex.Spec{
+				Name:    "m" + sha1Hash[0:38],
+				Clock:   &fakeClock{delay: time.Second},
+				Delay:   time.Millisecond,
+				Timeout: time.Second,
+			}
+			locker = filelocker{}
+			releaser, err = mutex.Acquire(spec)
+			locker.releaser = releaser
 			if err != nil {
 				return nil, err
 			}

@@ -46,7 +46,11 @@ func main() {
 		rulehandler.New(),
 		statemachine.New(),
 	)
-	defer exec.TearDown()
+	defer func() {
+		if exec != nil {
+			exec.TearDown()
+		}
+	}()
 	if err != nil {
 		panic(err)
 	}

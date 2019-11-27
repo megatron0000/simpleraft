@@ -13,6 +13,8 @@ Simpleraft implements:
 
 `go get github.com/googollee/go-socket.io` to install the library used for the webapp
 
+`go get github.com/juju/mutex` to install the library used for lockfiles (a raft node locks its database storage)
+
 # Contributing
 
 We recommend Visual Studio Code editor with Go extension by Microsoft (extension is installed through the editor itself).
