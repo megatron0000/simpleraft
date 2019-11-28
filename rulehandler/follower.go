@@ -7,11 +7,22 @@ import (
 
 // FollowerOnStateChanged implements raft rules
 func (handler *RuleHandler) FollowerOnStateChanged(msg iface.MsgStateChanged, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0) // list of actions created
+	actions := []interface{}{}
 
-	actions = append(actions, iface.ActionSetVotedFor{NewVotedFor: ""})  // as a new follower, VotedFor is initially empty
-	actions = append(actions, iface.ActionSetVoteCount{NewVoteCount: 0}) // as a follower, vote count must be set to 0
-	actions = append(actions, iface.ActionResetTimer{HalfTime: false})   // timeout should be reseted
+	// as a new follower, VotedFor is initially empty
+	actions = append(actions, iface.ActionSetVotedFor{
+		NewVotedFor: "",
+	})
+
+	// as a follower, vote count must be set to 0
+	actions = append(actions, iface.ActionSetVoteCount{
+		NewVoteCount: 0,
+	})
+
+	// timeout should be reset (waiting for election time)
+	actions = append(actions, iface.ActionResetTimer{
+		HalfTime: false,
+	})
 
 	return actions
 }
@@ -20,28 +31,71 @@ func (handler *RuleHandler) FollowerOnStateChanged(msg iface.MsgStateChanged, lo
 func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0) // list of actions created
 
-	actions = append(actions, iface.ActionResetTimer{HalfTime: false}) // timeout should be reseted
+	// since we are hearing from the leader, reset timeout
+	actions = append(actions, iface.ActionResetTimer{
+		HalfTime: false,
+	})
+
+	// maybe we are outdated
 	if msg.Term > status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetCurrentTerm{NewCurrentTerm: msg.Term})
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
 	}
 
-	// If 'append entry' is from a leader with smaller term OR log matching property not achieved yet
-	entry, err := log.Get(msg.PrevLogIndex)
-	if err != nil {
-		panic(err)
-	}
-	if msg.PrevLogIndex != int64(-1) && (msg.Term < status.CurrentTerm() || entry == nil || (msg.Term == status.CurrentTerm() && entry.Term != msg.PrevLogTerm)) {
-		actions = append(actions, iface.ReplyAppendEntries{Address: status.NodeAddress(), Success: false, Term: status.CurrentTerm()}) // not successfull append entry
+	prevEntry, _ := log.Get(msg.PrevLogIndex)
+
+	// leader is outdated ?
+	if msg.Term < status.CurrentTerm() {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address: status.NodeAddress(),
+			Success: false,
+			Term:    status.CurrentTerm(),
+		})
 		return actions
 	}
 
-	// as program jumped the if statement above, we have a successfull append entry
-	actions = append(actions, iface.ReplyAppendEntries{Address: status.NodeAddress(), Success: true, Term: status.CurrentTerm()})
-	if len(msg.Entries) > 0 {
-		actions = append(actions, iface.ActionDeleteLog{Count: (log.LastIndex() - msg.PrevLogIndex)}) // delete all entries in log after PrevLogIndex
-		actions = append(actions, iface.ActionAppendLog{Entries: msg.Entries})                        // append all entries sent by leader
+	// I dont have previous log entry (but should)
+	if prevEntry == nil && msg.PrevLogIndex != -1 {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address: status.NodeAddress(),
+			Success: false,
+			Term:    status.CurrentTerm(),
+		})
+		return actions
 	}
 
+	// I have previous log entry, but it does not match
+	if prevEntry != nil && prevEntry.Term != msg.PrevLogTerm {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address: status.NodeAddress(),
+			Success: false,
+			Term:    status.CurrentTerm(),
+		})
+		return actions
+	}
+
+	// all is ok. accept new entries
+	actions = append(actions, iface.ReplyAppendEntries{
+		Address: status.NodeAddress(),
+		Success: true,
+		Term:    status.CurrentTerm(),
+	})
+
+	// if there is anything to append, do it
+	if len(msg.Entries) > 0 {
+		// delete all entries in log after PrevLogIndex
+		actions = append(actions, iface.ActionDeleteLog{
+			Count: log.LastIndex() - msg.PrevLogIndex,
+		})
+		// append all entries sent by leader
+		actions = append(actions, iface.ActionAppendLog{
+			Entries: msg.Entries,
+		})
+	}
+
+	// if leader has committed more than we know, update our index
+	// and demand state-machine application
 	if msg.LeaderCommitIndex > status.CommitIndex() {
 		actions = append(actions, iface.ActionSetCommitIndex{
 			NewCommitIndex: int64(math.Min(
@@ -49,6 +103,28 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 				float64(msg.PrevLogIndex+int64(len(msg.Entries))),
 			)),
 		})
+		// order the state machine to apply the new committed entries
+		// (only if they are state machine commands)
+		// TODO: Treat configuration change
+		for index := status.CommitIndex() + 1; index < msg.LeaderCommitIndex; index++ {
+			var entry *iface.LogEntry
+
+			// get from my log
+			if index <= msg.PrevLogIndex {
+				entry, _ = log.Get(index)
+
+				// get from leader
+			} else {
+				entry = &msg.Entries[index-msg.PrevLogIndex-1]
+			}
+
+			switch entry.Kind {
+			case iface.EntryStateMachineCommand:
+				actions = append(actions, iface.ActionStateMachineApply{
+					EntryIndex: index,
+				})
+			}
+		}
 	}
 
 	return actions
@@ -56,71 +132,114 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 
 // FollowerOnRequestVote implements raft rules
 func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0) // list of actions created
+	actions := []interface{}{}
 
-	actions = append(actions, iface.ActionResetTimer{HalfTime: false}) // timeout should be reseted
-	// if candidate is in a smaller term, vote is not granted
+	// actions = append(actions, iface.ActionResetTimer{HalfTime: false}) // timeout should be reseted
+
+	// maybe we are outdated
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+	}
+
+	// if candidate is still in a previous term, reject vote
 	if msg.Term < status.CurrentTerm() {
-		actions = append(actions, iface.ReplyDecidedVote{VoteGranted: false, Term: status.CurrentTerm()}) // not successfull vote
+		actions = append(actions, iface.ReplyDecidedVote{
+			VoteGranted: false,
+			Term:        status.CurrentTerm(),
+		})
 		return actions
 	}
 
-	// if candidate is at least as updated as follower, vote is granted
-	if (status.VotedFor() == "" || status.VotedFor() == msg.CandidateAddress) &&
-		((status.CurrentTerm() < msg.LastLogTerm) ||
-			((status.CurrentTerm() == msg.LastLogTerm) &&
-				(status.CommitIndex() <= msg.LastLogIndex))) {
-		actions = append(actions, iface.ReplyDecidedVote{VoteGranted: true, Term: status.CurrentTerm()})
-		actions = append(actions, iface.ActionSetVotedFor{NewVotedFor: msg.CandidateAddress}) // vote is granted
-	} else {
-		actions = append(actions, iface.ReplyDecidedVote{VoteGranted: false, Term: status.CurrentTerm()}) // not successfull vote
+	// reject vote if we voted on another peer already
+	if status.VotedFor() != "" && status.VotedFor() != msg.CandidateAddress {
+		actions = append(actions, iface.ReplyDecidedVote{
+			VoteGranted: false,
+			Term:        status.CurrentTerm(),
+			Address:     status.NodeAddress(),
+		})
+		return actions
 	}
 
+	lastEntry, _ := log.Get(log.LastIndex())
+
+	// if we have no log, surely peer is at least as updated as us. so grant vote
+	if lastEntry == nil {
+		actions = append(actions, iface.ReplyDecidedVote{
+			VoteGranted: true,
+			Term:        status.CurrentTerm(),
+			Address:     status.NodeAddress(),
+		})
+		actions = append(actions, iface.ActionSetVotedFor{
+			NewVotedFor: msg.CandidateAddress,
+		})
+		return actions
+	}
+
+	// ok, we have log. grant vote if peer is as updated as us
+	if msg.LastLogTerm > lastEntry.Term || (msg.LastLogTerm == lastEntry.Term && msg.LastLogIndex >= log.LastIndex()) {
+		actions = append(actions, iface.ReplyDecidedVote{
+			VoteGranted: true,
+			Term:        status.CurrentTerm(),
+			Address:     status.NodeAddress(),
+		})
+		actions = append(actions, iface.ActionSetVotedFor{
+			NewVotedFor: msg.CandidateAddress,
+		})
+		return actions
+	}
+
+	// ok, peer is not as updated as us
+	actions = append(actions, iface.ReplyDecidedVote{
+		VoteGranted: false,
+		Term:        status.CurrentTerm(),
+		Address:     status.NodeAddress(),
+	})
 	return actions
+
 }
 
 // FollowerOnAddServer implements raft rules
 func (handler *RuleHandler) FollowerOnAddServer(msg iface.MsgAddServer, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0)                 // list of actions created
-	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
-	return actions
+	// leader should be responsible for this
+	return []interface{}{iface.ReplyNotLeader{}}
 }
 
 // FollowerOnRemoveServer implements raft rules
 func (handler *RuleHandler) FollowerOnRemoveServer(msg iface.MsgRemoveServer, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0)                 // list of actions created
-	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
-	return actions
+	// leader should be responsible for this
+	return []interface{}{iface.ReplyNotLeader{}}
 }
 
 // FollowerOnTimeout implements raft rules
 func (handler *RuleHandler) FollowerOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0) // list of actions created
-	actions = append(actions, iface.ActionResetTimer{HalfTime: false})
-	actions = append(actions, iface.ActionSetState{NewState: iface.StateCandidate}) // a timeout for a follower means it should change its state to candidate
-	return actions
+	// timed out without hearing from leader... election tiiiime !
+	return []interface{}{iface.ActionSetState{
+		NewState: iface.StateCandidate,
+	}}
 }
 
 // FollowerOnStateMachineCommand implements raft rules
 func (handler *RuleHandler) FollowerOnStateMachineCommand(msg iface.MsgStateMachineCommand, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0)                 // list of actions created
-	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
-	return actions
+	// leader should be responsible for this
+	return []interface{}{iface.ReplyNotLeader{}}
 }
 
 // FollowerOnStateMachineProbe implements raft rules
 func (handler *RuleHandler) FollowerOnStateMachineProbe(msg iface.MsgStateMachineProbe, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := make([]interface{}, 0)                 // list of actions created
-	actions = append(actions, iface.ReplyNotLeader{}) // leader should be responsable for this activity
-	return actions
+	// leader should be responsible for this
+	return []interface{}{iface.ReplyNotLeader{}}
 }
 
 // FollowerOnAppendEntriesReply implements raft rules
 func (handler *RuleHandler) FollowerOnAppendEntriesReply(msg iface.MsgAppendEntriesReply, log iface.RaftLog, status iface.Status) []interface{} {
+	// delayed append entries reply. ignore it
 	return []interface{}{}
 }
 
 // FollowerOnRequestVoteReply implements raft rules
 func (handler *RuleHandler) FollowerOnRequestVoteReply(msg iface.MsgRequestVoteReply, log iface.RaftLog, status iface.Status) []interface{} {
+	// delayed request vote reply. ignore it
 	return []interface{}{}
 }
