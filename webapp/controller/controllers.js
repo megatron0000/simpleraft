@@ -13,6 +13,76 @@
     // if you have many controllers, it's better to separate them into files
   }]);
 
+  App.controller("ClientController", function ($scope, Socket) {
+    $scope.waitingResponse = false
+    $scope.response = "none"
+
+
+    $scope.commandInvalid = function (command) {
+      return ['read', 'write'].indexOf(command) === -1
+    }
+    /**
+     * @param {string} key
+     */
+    $scope.keyInvalid = function (key) {
+      return !key || key.trim() === ''
+    }
+    /**
+     * @param {string} value
+     */
+    $scope.valueInvalid = function (value) {
+      return $scope.command == 'write' && (!value || value.trim() === '')
+    }
+
+    $scope.sendCommand = function (command, key, value) {
+      $scope.waitingResponse = true
+      $scope.response = "......"
+      setTimeout(function () {
+        Socket.emit('new-client-command', command, key, value || '')
+      }, 1000);
+    }
+
+    Socket.on('ack', function () {
+      $scope.waitingResponse = false
+      $scope.$apply()
+    })
+
+    /**
+     * @param {string} info
+     */
+    Socket.on('client-info', function (info) {
+      let res = info
+      try {
+        res = atob(info)
+      } catch (e) {
+        res = JSON.stringify(info, null, 2)
+      }
+      $scope.response = res
+      $scope.$apply()
+    })
+
+    $scope.index = 0
+    $scope.term = 0
+
+    $scope.indexInvalid = function (index) {
+      return Math.round(index) !== index || index < 0
+    }
+
+    $scope.termInvalid = function (term) {
+      return Math.round(term) !== term || term < 0
+    }
+
+    $scope.sendProbe = function (index, term) {
+      $scope.waitingResponse = true
+      $scope.response = "......"
+      setTimeout(function () {
+        Socket.emit('new-client-probe', index, term)
+      }, 1000);
+    }
+
+
+  })
+
   App.controller("StatusController", function ($scope, Socket) {
 
     // if ($('[data-toggle="switch"]').length) {

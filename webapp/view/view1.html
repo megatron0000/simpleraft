@@ -194,7 +194,7 @@
       <div class="form-group">
         <label for="inputLogDeleteCount" class="col-sm-5 control-label">Delete some log entries (from the end of the
           log)</label>
-        <div class="col-sm-6">
+        <div class="col-sm-7">
           <div class="input-group">
             <input type="number" class="form-control" id="inputLogDeleteCount" ng-model="logDeleteCount">
             <a ng-disabled="waitingResponse || logDeleteCountInvalid(logDeleteCount)" class="input-group-addon input"
@@ -207,12 +207,12 @@
 
       <div class="form-group">
         <label class="col-sm-3 control-label">Log Entries</label>
-        <div class="col-sm-7">
+        <div class="col-sm-9">
           <div class="form-horizontal">
             <div class="form-group" ng-repeat="(index, entry) in logs track by $index">
               <label class="col-sm-3 control-label">Index {{index}}</label>
               <div class="col-sm-9">
-                <textarea rows="6" class="form-control" ng-model="entry" json-print="entry"></textarea>
+                <textarea rows="8" class="form-control" ng-model="entry" json-print="entry"></textarea>
               </div>
             </div>
           </div>

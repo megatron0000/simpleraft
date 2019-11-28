@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"simpleraft/executor"
 	"simpleraft/iface"
+	"simpleraft/transport"
 
 	socketio "github.com/googollee/go-socket.io"
 )
@@ -83,6 +84,7 @@ func (app *RaftWebApp) Start() {
 	server.OnEvent("/", "set-node-address", func(s socketio.Conn, msg string) {
 		s.SetContext("")
 		app.executor.Status().SetNodeAddress(iface.PeerAddress(msg))
+		app.executor.Transport().ChangeAddress(msg)
 		s.Emit("node-address-info", app.executor.Status().NodeAddress())
 		s.Emit("ack")
 	})
@@ -331,6 +333,7 @@ func (app *RaftWebApp) Start() {
 	})
 
 	server.OnEvent("/", "remove-logs", func(s socketio.Conn, count int) {
+		s.SetContext("")
 		length := app.executor.Log().LastIndex() + 1
 		for index := 0; index < count && index < int(length); index++ {
 			app.executor.Log().Remove()
@@ -356,6 +359,66 @@ func (app *RaftWebApp) Start() {
 		}
 
 		s.Emit("logs-info", logs)
+		s.Emit("ack")
+	})
+
+	server.OnEvent("/", "new-client-command", func(s socketio.Conn, operation string,
+		key string, value string) {
+		s.SetContext("")
+		trans := transport.New("")
+		type Req struct {
+			Operation string
+			Key       string
+			Value     string
+		}
+		type Encapsulation struct {
+			Command []byte
+		}
+		req := Req{Operation: operation, Key: key, Value: value}
+		marshal, err := json.Marshal(req)
+		if err != nil {
+			s.Emit("client-info", err)
+			s.Emit("ack")
+			return
+		}
+		encaps := Encapsulation{Command: marshal}
+		marshal2, err := json.Marshal(encaps)
+		if err != nil {
+			s.Emit("client-info", err)
+			s.Emit("ack")
+			return
+		}
+		replyChan := trans.Send(string(app.executor.Status().NodeAddress())+"/stateMachineCommand",
+			marshal2)
+		res, ok := <-replyChan
+		if !ok {
+			s.Emit("client-info", "internal error")
+			s.Emit("ack")
+			return
+		}
+		s.Emit("client-info", res)
+		s.Emit("ack")
+	})
+
+	server.OnEvent("/", "new-client-probe", func(s socketio.Conn, index int64, term int64) {
+		s.SetContext("")
+		trans := transport.New("")
+		req := iface.MsgStateMachineProbe{Index: index, Term: term}
+		marshal, err := json.Marshal(req)
+		if err != nil {
+			s.Emit("client-info", err)
+			s.Emit("ack")
+			return
+		}
+		replyChan := trans.Send(string(app.executor.Status().NodeAddress())+"/stateMachineProbe",
+			marshal)
+		res, ok := <-replyChan
+		if !ok {
+			s.Emit("client-info", "internal error")
+			s.Emit("ack")
+			return
+		}
+		s.Emit("client-info", res)
 		s.Emit("ack")
 	})
 

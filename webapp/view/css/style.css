@@ -6,6 +6,15 @@ a.input[disabled] {
   cursor: not-allowed;
 }
 
+
+a.btn:hover {
+  cursor: pointer;
+}
+
+a.btn[disabled] {
+  cursor: not-allowed;
+}
+
 .background-off {
   background-color: none;
 }
@@ -33,4 +42,9 @@ html[xmlns] .clearfix {
 
 * html .clearfix {
   height: 1%;
+}
+
+.navbar-inverse .navbar-nav>li>a.active {
+  color: #fff;
+  background-color: #1abc9c;
 }

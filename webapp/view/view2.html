@@ -1,1 +1,97 @@
-<h1>VIEW 2</h1>
+<div>
+  <div ng-controller="ClientController" class="clearfix">
+
+    <div class="col-sm-6">
+      <h4>Send a command to raft state machine</h4>
+      <form class="form-horizontal">
+
+        <div class="form-group">
+          <label for="inputCommand" class="col-sm-3 control-label">Command</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="text" class="form-control" id="inputCommand" ng-model="command">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="commandInvalid(command)">Must be one of "read",
+              "write"</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputKey" class="col-sm-3 control-label">Key</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="text" class="form-control" id="inputKey" ng-model="key">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="keyInvalid(key)">Must be non-empty</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputValue" class="col-sm-3 control-label">Value</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="text" class="form-control" id="inputValue" ng-model="value">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="valueInvalid(value)">Must be non-empty</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="col-sm-3 control-label">Send to raft</label>
+          <div class="col-sm-7">
+            <a ng-disabled="waitingResponse || commandInvalid(command) || keyInvalid(key) || valueInvalid(value)"
+              class="btn btn-default"
+              ng-click="!waitingResponse && !commandInvalid(command) && !keyInvalid(key) && !valueInvalid(value) && sendCommand(command, key, value)">{{waitingResponse ? "..." : "Submit"}}</a>
+          </div>
+        </div>
+
+      </form>
+
+
+    </div>
+
+    <div class="col-sm-6">
+      <h4>Check command completion</h4>
+      <form class="form-horizontal">
+
+        <div class="form-group">
+          <label for="inputIndex" class="col-sm-3 control-label">Index</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="number" class="form-control" id="inputIndex" ng-model="index">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="indexInvalid(index)">Must be integer >= 0</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputTerm" class="col-sm-3 control-label">Term</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="number" class="form-control" id="inputTerm" ng-model="term">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="termInvalid(term)">Must be integer >= 0</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="col-sm-3 control-label">Send to raft</label>
+          <div class="col-sm-7">
+            <a ng-disabled="waitingResponse || indexInvalid(index) || termInvalid(term)" class="btn btn-default"
+              ng-click="!waitingResponse && !indexInvalid(index) && !termInvalid(term) && sendProbe(index, term)">{{waitingResponse ? "..." : "Submit"}}</a>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="col-sm-12">
+      <h4>Response from raft:</h4>
+      <pre style="background-color:lightgrey;">
+          {{response}}
+        </pre>
+    </div>
+
+  </div>
+
+</div>
