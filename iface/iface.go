@@ -250,8 +250,12 @@ type ReplyNotLeader struct {
 // to the current raft node; this node cannot complete
 // the action right away; so we must warn the client
 // that it should check again at a later time to see
-// if the action has been performed
+// if the action has been performed. We must inform
+// the index and term where the client command's
+// log entry is located
 type ReplyCheckLater struct {
+	Index int64
+	Term  int64
 }
 
 // ReplyFailed means: A client requested an action
