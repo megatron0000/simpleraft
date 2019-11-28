@@ -99,14 +99,14 @@ func (transport *Transport) Send(address string, data []byte) (replyChan chan []
 	go func() {
 		res, err := client.Post(address, "application/json", bytes.NewReader(data))
 		if err != nil {
-			fmt.Printf("transport error: %+v\n", err)
+			fmt.Printf("transport: error: %+v\n", err)
 			close(replyChan)
 			return
 		}
 		defer res.Body.Close()
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			fmt.Printf("transport error: %+v\n", err)
+			fmt.Printf("transport: error: %+v\n", err)
 			close(replyChan)
 			return
 		}

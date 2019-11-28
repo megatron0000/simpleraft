@@ -360,10 +360,10 @@ func (app *RaftWebApp) Start() {
 	})
 
 	server.OnError("/", func(s socketio.Conn, e error) {
-		fmt.Println("meet error:", e)
+		// fmt.Println("meet error:", e)
 	})
 	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
-		fmt.Println("closed", reason)
+		// fmt.Println("closed", reason)
 	})
 
 	go server.Serve()
