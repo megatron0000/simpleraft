@@ -9,6 +9,7 @@ import (
 	"simpleraft/status"
 	"simpleraft/storage"
 	"simpleraft/transport"
+	"strconv"
 	"time"
 )
 
@@ -205,6 +206,7 @@ func (executor *Executor) forwardIncoming(msg transport.IncomingMessage) []inter
 		addServer           *iface.MsgAddServer
 		removeServer        *iface.MsgRemoveServer
 		stateMachineCommand *iface.MsgStateMachineCommand
+		stateMachineProbe   *iface.MsgStateMachineProbe
 		actions             []interface{}
 		err                 error
 	)
@@ -343,6 +345,32 @@ func (executor *Executor) forwardIncoming(msg transport.IncomingMessage) []inter
 		case iface.StateLeader:
 			actions = executor.handler.LeaderOnStateMachineCommand(
 				*stateMachineCommand,
+				executor.log,
+				executor.status)
+
+		}
+
+	case "/stateMachineProbe":
+		if err = json.Unmarshal(msg.Data, &stateMachineProbe); err != nil {
+			msg.ReplyChan <- []byte("Bad Request")
+			return nil
+		}
+		switch executor.status.State() {
+		case iface.StateFollower:
+			actions = executor.handler.FollowerOnStateMachineProbe(
+				*stateMachineProbe,
+				executor.log,
+				executor.status)
+
+		case iface.StateCandidate:
+			actions = executor.handler.CandidateOnStateMachineProbe(
+				*stateMachineProbe,
+				executor.log,
+				executor.status)
+
+		case iface.StateLeader:
+			actions = executor.handler.LeaderOnStateMachineProbe(
+				*stateMachineProbe,
 				executor.log,
 				executor.status)
 
@@ -526,7 +554,9 @@ func (executor *Executor) implementActions(
 			if replyChan == nil {
 				panic("handler tried to issue a Reply* to a local event")
 			}
-			replyChan <- []byte("check later")
+			replyChan <- []byte("check later. index: " +
+				strconv.Itoa(int(action.Index)) + ", term: " +
+				strconv.Itoa(int(action.Term)))
 
 		case iface.ReplyFailed:
 			if replyChan == nil {
