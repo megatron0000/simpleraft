@@ -142,6 +142,7 @@ func (executor *Executor) Run() {
 
 	// trigger first event change (actually, not a change
 	// since there was no prior state in the first place )
+	executor.status.SetState(iface.StateFollower)
 	actions = executor.forwardStateChanged()
 	executor.implementActions(actions, nil, iface.MsgStateChanged{})
 
@@ -722,10 +723,20 @@ func (executor *Executor) implementActions(
 	}
 }
 
+// Status gives access to the underlying Status instance.
+// Altering this instance my leave the node in inconsistent state
 func (executor *Executor) Status() *status.Status {
 	return executor.status
 }
 
+// Log gives access to the underlying RaftLog instance.
+// Altering this instance my leave the node in inconsistent state
 func (executor *Executor) Log() *raftlog.RaftLog {
 	return executor.log
+}
+
+// Transport gives access to the underlying Transport instance.
+// Altering this instance my leave the node in inconsistent state
+func (executor *Executor) Transport() *transport.Transport {
+	return executor.transport
 }
