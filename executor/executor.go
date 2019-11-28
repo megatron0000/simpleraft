@@ -111,6 +111,10 @@ func New(
 		stopped:                make(chan bool),
 	}
 
+	// initialize random seed so that different raft nodes
+	// will use different random sequences
+	rand.Seed(time.Now().UnixNano())
+
 	return executor, nil
 }
 
@@ -649,12 +653,8 @@ func (executor *Executor) implementActions(
 
 			go func() {
 				reply := <-replyChan
-				// if !ok {
-				// 	fmt.Printf("!OK\n")
-				// 	return
-				// }
 				if reply == nil {
-					fmt.Printf("NULL\n")
+					fmt.Printf("executor: transport: receive reply failed\n")
 					return
 				}
 				unmarshal := iface.MsgAppendEntriesReply{}
@@ -678,12 +678,12 @@ func (executor *Executor) implementActions(
 			go func() {
 				reply := <-replyChan
 				if reply == nil {
-					fmt.Printf("error: received nil reply")
+					fmt.Printf("executor: transport: error: received nil reply\n")
 					return
 				}
 				unmarshal := iface.MsgRequestVoteReply{}
 				if err := json.Unmarshal(reply, &unmarshal); err != nil {
-					fmt.Printf("error: on unmarshal %+v\n", string(reply))
+					fmt.Printf("executor: transport: error: on unmarshal %+v\n", string(reply))
 					return
 				}
 				executor.requestVoteReplyChan <- unmarshal
