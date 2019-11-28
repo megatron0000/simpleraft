@@ -19,7 +19,8 @@
             <a ng-disabled="waitingResponse || nodeStateInvalid(nodeState)" class="input-group-addon input"
               ng-click="!waitingResponse && !nodeStateInvalid(nodeState) && setNodeState(nodeState)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="nodeStateInvalid(nodeState)">Must be one of "follower", "candidate", "leader"</span>
+          <span style="font-size:0.8em;color:red;" ng-show="nodeStateInvalid(nodeState)">Must be one of "follower",
+            "candidate", "leader"</span>
         </div>
       </div>
 
@@ -32,7 +33,8 @@
             <a ng-disabled="waitingResponse || nodeAddressInvalid(nodeAddress)" class="input-group-addon input"
               ng-click="!waitingResponse && !nodeAddressInvalid(nodeAddress) && setNodeAddress(nodeAddress)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="nodeAddressInvalid(nodeAddress)">Must be a valid network address (like
+          <span style="font-size:0.8em;color:red;" ng-show="nodeAddressInvalid(nodeAddress)">Must be a valid network
+            address (like
             "localhost:10001")</span>
         </div>
       </div>
@@ -45,7 +47,7 @@
             <a ng-disabled="waitingResponse || currentTermInvalid(currentTerm)" class="input-group-addon input"
               ng-click="!waitingResponse && !currentTermInvalid(currentTerm) && setCurrentTerm(currentTerm)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="currentTermInvalid(currentTerm)">Must be integer >= 0</span>
+          <span style="font-size:0.8em;color:red;" ng-show="currentTermInvalid(currentTerm)">Must be integer >= 0</span>
         </div>
       </div>
 
@@ -57,7 +59,8 @@
             <a ng-disabled="waitingResponse || votedForInvalid(votedFor)" class="input-group-addon input"
               ng-click="!waitingResponse && !votedForInvalid(votedFor) && setVotedFor(votedFor)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="votedForInvalid(votedFor)">Must be either the empty string ("") or a valid network
+          <span style="font-size:0.8em;color:red;" ng-show="votedForInvalid(votedFor)">Must be either the empty string
+            ("") or a valid network
             address</span>
         </div>
       </div>
@@ -70,7 +73,7 @@
             <a ng-disabled="waitingResponse || voteCountInvalid(voteCount)" class="input-group-addon input"
               ng-click="!waitingResponse && !voteCountInvalid(voteCount) && setVoteCount(voteCount)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="voteCountInvalid(voteCount)">Must be integer >= 0</span>
+          <span style="font-size:0.8em;color:red;" ng-show="voteCountInvalid(voteCount)">Must be integer >= 0</span>
         </div>
       </div>
 
@@ -82,7 +85,8 @@
             <a ng-disabled="waitingResponse || commitIndexInvalid(commitIndex)" class="input-group-addon input"
               ng-click="!waitingResponse && !commitIndexInvalid(commitIndex) && setCommitIndex(commitIndex)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="commitIndexInvalid(commitIndex)">Must be integer >= -1</span>
+          <span style="font-size:0.8em;color:red;" ng-show="commitIndexInvalid(commitIndex)">Must be integer >=
+            -1</span>
         </div>
       </div>
 
@@ -94,7 +98,8 @@
             <a ng-disabled="waitingResponse || lastAppliedInvalid(lastApplied)" class="input-group-addon input"
               ng-click="!waitingResponse && !lastAppliedInvalid(lastApplied) && setLastApplied(lastApplied)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="lastAppliedInvalid(lastApplied)">Must be integer >= -1</span>
+          <span style="font-size:0.8em;color:red;" ng-show="lastAppliedInvalid(lastApplied)">Must be integer >=
+            -1</span>
         </div>
       </div>
 
@@ -106,7 +111,8 @@
             <a ng-disabled="waitingResponse || peerAddressesInvalid(peerAddresses)" class="input-group-addon input"
               ng-click="!waitingResponse && !peerAddressesInvalid(peerAddresses) && setPeerAddresses(peerAddresses)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="peerAddressesInvalid(peerAddresses)">Must be a list of valid network addresses separated by
+          <span style="font-size:0.8em;color:red;" ng-show="peerAddressesInvalid(peerAddresses)">Must be a list of valid
+            network addresses separated by
             ","</span>
         </div>
       </div>
@@ -123,7 +129,8 @@
                   <a ng-disabled="waitingResponse || nextIndexInvalid(peer.NextIndex)" class="input-group-addon input"
                     ng-click="!waitingResponse && !nextIndexInvalid(peer.NextIndex) && setNextIndex(peer.PeerAddress, peer.NextIndex)">{{waitingResponse ? "..." : "Save"}}</a>
                 </div>
-                <span ng-show="nextIndexInvalid(peer.NextIndex)">Must be integer >= 0</span>
+                <span style="font-size:0.8em;color:red;" ng-show="nextIndexInvalid(peer.NextIndex)">Must be integer >=
+                  0</span>
               </div>
             </div>
           </div>
@@ -142,7 +149,8 @@
                   <a ng-disabled="waitingResponse || matchIndexInvalid(peer.MatchIndex)" class="input-group-addon input"
                     ng-click="!waitingResponse && !matchIndexInvalid(peer.MatchIndex) && setMatchIndex(peer.PeerAddress, peer.MatchIndex)">{{waitingResponse ? "..." : "Save"}}</a>
                 </div>
-                <span ng-show="matchIndexInvalid(peer.MatchIndex)">Must be integer >= -1</span>
+                <span style="font-size:0.8em;color:red;" ng-show="matchIndexInvalid(peer.MatchIndex)">Must be integer >=
+                  -1</span>
               </div>
             </div>
           </div>
@@ -158,7 +166,8 @@
               class="input-group-addon input"
               ng-click="!waitingResponse && !clusterChangeIndexInvalid(clusterChangeIndex) && setClusterChangeIndex(clusterChangeIndex)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="clusterChangeIndexInvalid(clusterChangeIndex)">Must be integer >= -1</span>
+          <span style="font-size:0.8em;color:red;" ng-show="clusterChangeIndexInvalid(clusterChangeIndex)">Must be
+            integer >= -1</span>
         </div>
       </div>
 
@@ -171,7 +180,8 @@
               class="input-group-addon input"
               ng-click="!waitingResponse && !clusterChangeTermInvalid(clusterChangeTerm) && setClusterChangeTerm(clusterChangeTerm)">{{waitingResponse ? "..." : "Save"}}</a>
           </div>
-          <span ng-show="clusterChangeTermInvalid(clusterChangeTerm)">Must be integer >= -1</span>
+          <span style="font-size:0.8em;color:red;" ng-show="clusterChangeTermInvalid(clusterChangeTerm)">Must be integer
+            >= -1</span>
         </div>
       </div>
 
@@ -180,6 +190,21 @@
     </form>
 
     <form class="form-horizontal col-sm-6">
+
+      <div class="form-group">
+        <label for="inputLogDeleteCount" class="col-sm-5 control-label">Delete some log entries (from the end of the
+          log)</label>
+        <div class="col-sm-6">
+          <div class="input-group">
+            <input type="number" class="form-control" id="inputLogDeleteCount" ng-model="logDeleteCount">
+            <a ng-disabled="waitingResponse || logDeleteCountInvalid(logDeleteCount)" class="input-group-addon input"
+              ng-click="!waitingResponse && !logDeleteCountInvalid(logDeleteCount) && deleteFromLog(logDeleteCount)">{{waitingResponse ? "..." : "Save"}}</a>
+          </div>
+          <span style="font-size:0.8em;color:red;" ng-show="logDeleteCountInvalid(logDeleteCount)">Must be integer
+            >= 1</span>
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="col-sm-3 control-label">Log Entries</label>
         <div class="col-sm-7">
@@ -193,6 +218,7 @@
           </div>
         </div>
       </div>
+
     </form>
 
   </div>

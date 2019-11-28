@@ -261,6 +261,17 @@
       $scope.$apply()
     })
 
+    $scope.logDeleteCount = 1
+    $scope.logDeleteCountInvalid = function (logDeleteCount) {
+      return Math.round(logDeleteCount) !== logDeleteCount || logDeleteCount <= 0
+    }
+    $scope.deleteFromLog = function (logDeleteCount) {
+      $scope.waitingResponse = true
+      setTimeout(function () {
+        Socket.emit('remove-logs', logDeleteCount)
+      }, 1000)
+    }
+
     setInterval(() => {
       if (!$scope.executorRunning) return
       // Socket.emit('get-executor-is-running')

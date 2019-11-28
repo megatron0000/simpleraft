@@ -161,6 +161,37 @@ func (app *RaftWebApp) Start() {
 		}
 		app.executor.Status().SetPeerAddresses(addresses)
 		s.Emit("peer-addresses-info", app.executor.Status().PeerAddresses())
+
+		// same code as 'get-next-indexes'
+		s.SetContext("")
+		type Res struct {
+			PeerAddress iface.PeerAddress
+			NextIndex   int64
+		}
+		list := []Res{}
+		for _, addr := range app.executor.Status().PeerAddresses() {
+			list = append(list, Res{
+				PeerAddress: addr,
+				NextIndex:   app.executor.Status().NextIndex(addr),
+			})
+		}
+		s.Emit("next-indexes-info", list)
+
+		// same code as 'get-match-indexes'
+		s.SetContext("")
+		type Res2 struct {
+			PeerAddress iface.PeerAddress
+			MatchIndex  int64
+		}
+		list2 := []Res2{}
+		for _, addr := range app.executor.Status().PeerAddresses() {
+			list2 = append(list2, Res2{
+				PeerAddress: addr,
+				MatchIndex:  app.executor.Status().MatchIndex(addr),
+			})
+		}
+		s.Emit("match-indexes-info", list2)
+
 		s.Emit("ack")
 	})
 
@@ -297,6 +328,35 @@ func (app *RaftWebApp) Start() {
 
 		s.Emit("logs-info", logs)
 
+	})
+
+	server.OnEvent("/", "remove-logs", func(s socketio.Conn, count int) {
+		length := app.executor.Log().LastIndex() + 1
+		for index := 0; index < count && index < int(length); index++ {
+			app.executor.Log().Remove()
+		}
+
+		type Log struct {
+			Term    int64
+			Command string
+			Kind    string
+			Result  string
+		}
+
+		logs := []Log{}
+
+		for index := int64(0); index <= app.executor.Log().LastIndex(); index++ {
+			log, _ := app.executor.Log().Get(index)
+			logs = append(logs, Log{
+				Term:    log.Term,
+				Command: string(log.Command),
+				Kind:    log.Kind,
+				Result:  string(log.Result),
+			})
+		}
+
+		s.Emit("logs-info", logs)
+		s.Emit("ack")
 	})
 
 	server.OnError("/", func(s socketio.Conn, e error) {
