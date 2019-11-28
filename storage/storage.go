@@ -90,8 +90,8 @@ func New(name string) (storage *Storage, err error) {
 			)
 			fpath, err = filepath.Abs(name)
 			h = sha1.New()
-			sha1Hash = hex.EncodeToString(h.Sum(nil))
 			h.Write([]byte(fpath))
+			sha1Hash = hex.EncodeToString(h.Sum(nil))
 			if err != nil {
 				panic(err)
 			}
