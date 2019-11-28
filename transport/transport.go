@@ -83,6 +83,13 @@ func (transport *Transport) Close() {
 // effect only when the transport service is restarted
 func (transport *Transport) ChangeAddress(newAddress string) {
 	transport.address = newAddress
+	handler := handler{}
+	server := &http.Server{
+		Addr:    newAddress,
+		Handler: &handler,
+	}
+	handler.transport = transport
+	transport.server = server
 }
 
 // Send sends a message to `address` and returns a channel from
