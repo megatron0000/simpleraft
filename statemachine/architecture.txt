@@ -1,0 +1,5 @@
+An example state machine. Anything that implementes iface.StateMachine
+interface can be "plugged" as a state machine for raft.
+
+This package implements this interface: a simple in-memory key-value 
+store

@@ -234,7 +234,7 @@ type MsgStateMachineProbe struct {
 // node sent AppendEntries to another one sometime
 // in the past; now we are receiving the result
 type MsgAppendEntriesReply struct {
-	// address of the raft node who is sending the reply
+	// address of the raft node who is sending the reply (us !)
 	Address PeerAddress
 	Success bool
 	Term    int64
@@ -244,7 +244,7 @@ type MsgAppendEntriesReply struct {
 // node sent RequestVote to another one sometime
 // in the past; now we are receiving the result
 type MsgRequestVoteReply struct {
-	// address of the raft node who is sending the reply
+	// address of the raft node who is sending the reply (us !)
 	Address     PeerAddress
 	VoteGranted bool
 	Term        int64
@@ -301,7 +301,7 @@ type ReplyCompleted struct {
 // whether to vote or not; so we must communicate
 // this decision to the caller
 type ReplyRequestVote struct {
-	// address of the raft node who is sending the reply
+	// address of the raft node who is sending the reply (us !)
 	Address     PeerAddress
 	VoteGranted bool
 	Term        int64
@@ -312,7 +312,7 @@ type ReplyRequestVote struct {
 // have processed this request; so we must
 // communicate the results to the caller
 type ReplyAppendEntries struct {
-	// address of the raft node who is sending the reply
+	// address of the raft node who is sending the reply (us !)
 	Address PeerAddress
 	Success bool
 	Term    int64

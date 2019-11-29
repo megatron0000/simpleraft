@@ -6,11 +6,11 @@
    |     +---------------->  x |                    |                             |   Application  |
    |                         x |                    |   2:  publish request to    |                |
    |        1:  Request  xxxxx |                    |       "receiver" channel    |                |
-   |                           |                    |                             +----------------+
-   |                           +--------------------+
+   |                           |                    |       (so that application  +----------------+
+   |                           +--------------------+       can detect)
    |
    |
    |     <------------------+                             <--------------+
    |
-  ++        4: Respond                                 3:   write response to
+  ++        4: Respond with "x"                        3:   write response "x" to
 Internet                                                    "reply" channel

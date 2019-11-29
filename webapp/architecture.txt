@@ -1,0 +1,30 @@
+This webapp comes from an Angular template (hence there are some
+unneeded files).
+
+Application-specific files are "controller/controllers.js", 
+"view/view1.html", "view/view2.html", "index.html" and "webapp.go".
+
+"webapp.go" implements an websocket-enabled http server, which encapsulates
+an Executor component (see "executor" package) to be able to directly
+monitor and change Executor configurations (like node/peer addresses etc.)
+
+Other files are static files served by the webapp (frontend angularjs framework
+with socket.io library for websocket communication with the backend)
+
+
+                                                   send state
+
+               encapsulates                       +-------->
+                                   XXXX                          +--------------+
+Raft executor <-------+  webapp.go X  websocket                  |.+----------+.|
+instance                           X  interface                  ++            ++
+                                   X                             ||            ||
+                                   X                             ||            ||
+                                   XXXX                          ||            ||
+                                                 <-------+       |--------------|
+                                                                 ++..|------|..++
+                                                  send commands  .+------------+.
+                                                                / /============\ \
+                                                               / /==============\ \
+                                                              /____________________\
+                                                              \____________________/

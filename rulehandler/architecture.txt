@@ -1,0 +1,24 @@
+Raft Rule Handler is the most-high-level component which works in
+a rule-based fashion:
+
+1) Executor component sends a message to handler component.
+   Message may be:
+    1. AppendEntries call from other raft node
+    2. Command sent by client
+    3. Timeout (of the node's own timer)
+    4. etc.
+
+2) Handler component acts based on the message and returns a list
+   of actions it judges to be appropriate (i.e. conforming to raft
+   protocol rules). In fact, the handler component implements
+   iface.RuleHandler interface
+  
+3) Executor receives the list of actions and implements those
+   actions.
+
+Example:
+
+1. Executor passes message "A candidate requested our vote";
+2. Handler responds with "We should not grant our vote";
+3. Executor uses the transport service to implement this action,
+   effectively responding to the candidate

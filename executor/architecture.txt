@@ -1,3 +1,14 @@
+An Executor instance encapsulates a "Status", a "RaftLog" and a "Transport" component.
+Executor is the raft node itself, receiving messages via Transport, altering state
+via Status and registering things via RaftLog.
+
+To work, Executor also encapsulates a RuleHandler implementation (which must be
+plugged to the Executor), because it is the RuleHandler who decides what-to-do (while
+Executor merely knows how-to-do after RuleHandler decides what-to-do)
+
+Finally, a StateMachine implementation must also be plugged to the Executor.
+
+
                               2: Transforms the message
                               to one of the Msg*                          4: Handler decides
                               family of structs                           what to do

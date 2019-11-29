@@ -6,12 +6,12 @@
     |     appropriate response and               |                           | Example: For a key=> value store,   |
     |     returns it.                            |  +----+                   | this component would implement the  |
     |     Has no knowledge of implementation_    |       |                   | store. Raft commands passed to here |
-    |     specific components                    |       |                   | would be Get()s and Put()s          |
-    |                                            |       |                   |                                     |
-    +-------------------+------------------------+       |                   +---------------------------+---------+
-                        ^                                |￼                                              ^
-           (1) ask for  |                                v                                               |  commit
-           action       +------------+                                                                   |
+    |     specific components                    |       |    (3) Implement  | would be Get()s and Put()s          |
+    |                                            |       |        actions    |                                     |
+    +-------------------+------------------------+       |     +-----+       +---------------------------+---------+
+                        ^                                |￼     |     |                                   ^
+           (1) ask for  |                                v     +     v                                   |   (4) Apply to
+           action       +------------+                                                                   |   state machine
                                            +---------------------------------------+   +-----------------+
                                            |               Executor                |
                                            |                                       |

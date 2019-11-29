@@ -3,6 +3,7 @@
            |              Status              |
            |                                  |       /raft/currentTerm
            |                                  |       /raft/votedFor
+           |                                  |       etc.
            |                                  |
            |                +                 |
            |                |                 |
@@ -13,7 +14,7 @@
                             v
 
            +---------------------------------+
-           |                                 |
+           |                                 |  (Storage component)
            |  key   +----------->  value     |
      disk  |                                 |
            |   +                    +        |
@@ -22,6 +23,6 @@
            +---------------------------------+
                |                    |
                v                    |
- (ASCII string as a []byte) <-------+
+  (JSON string as a []byte) <-------+
 
 example: "/raft/currentTerm" => "123"

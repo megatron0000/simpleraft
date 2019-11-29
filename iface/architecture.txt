@@ -1,0 +1,68 @@
+iface package defines high-level interfaces for RuleHandler to use. These
+interfaces can be organized in groups:
+
+==== Group 1: Raft Log ====
+
+1. LogEntry struct specifies what is contained in a log entry.
+   In fact, the "raftlog" package implements a log in accordance
+   with this struct.
+
+2. RaftLog interface is a subset of raftlog.RaftLog (the implementation).
+   This subset is read-only, and is intended to be used by RuleHandler.
+
+3. Entry* family of vars (EntryNoOp etc.) are the possible values
+   that can be inserted in the field "Kind" from struct "LogEntry"
+
+
+==== Group 2: Raft state ====
+
+1. Status interface is a subset of status.Status (the implementation).
+   This subset exposes only read-only methods, and is intended to be
+   used by RuleHandler. In general, Status holds all persistent
+   and non-persistent information of the node (current term, peers,
+   vote count, state etc.)
+
+2. State* family of vars (StateFollower, StateCandidate, StateLeader)
+   are the possible strings that can be returned by NodeState() method
+   from Status interface
+  
+3. PeerAddress type alias is just an alias for the "string" type.
+   Just to be clear when a string is a peer address. An address is
+   simply a network address, like "localhost:8080" (note that
+   we omit the protocol, meaning that we do not prefix the address
+   with "http://" nor anything of the sort)
+
+
+==== Group 3: State Machine ====
+
+1. The StateMachine interface is the contract which must be 
+   obeyed by a package for it to be used as a state machine
+   for raft. State machines are pluggable ! An example implementation
+   is the "statemachine" package
+
+
+==== Group 4: Rule Handler inputs and outputs ====
+
+1. Msg* family of structs (like MsgAppendEntries) are
+   all possible kinds of message that the Executor component
+   can pass to the RuleHandler component.
+
+2. Action* and Reply* families of structs (like ActionSetCurrentTerm)
+   are all possible outputs that RuleHandler can pass back to Executor.
+
+3. RuleHandler interface specifies all the possible ways that the 
+   Executor can pass a message to the RuleHandler. The idea is
+   that if the raft node is in state X (follower, candidate, or leader)
+   and the executor detects an event which motivates it to pass a message Y
+   to RuleHandler, then the Executor will call "XOnY()" method of RuleHandler,
+   passing the Y message, the read-only Status interface and the read-only RaftLog
+   interface. The RuleHandler must return a list of Action* and Reply* struct
+   instances.
+
+
+==== Group 4: ClusterChangeCommand struct ====
+
+This is a really hacky way of tracking cluster membership changes. If you
+reaaally need to understand it, you should do it by reading the code where
+it is used. Unless you plan on using cluster configuration changes, 
+you can safely ignore this struct's existence.
