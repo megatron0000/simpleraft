@@ -32,8 +32,8 @@ type Executor struct {
 	// configuration. Should be the same among
 	// all nodes in the cluster, lest unexpected
 	// results may issue
-	minElectionTimeout int
-	maxElectionTimeout int
+	minElectionTimeout time.Duration
+	maxElectionTimeout time.Duration
 
 	timer *time.Timer
 	// buffered channel (when a peer answer one of our AppendEntries, this channel
@@ -62,8 +62,8 @@ func New(
 	nodeAddress iface.PeerAddress,
 	peerAddresses []iface.PeerAddress,
 	storageFilePath string,
-	minElectionTimeout int,
-	maxElectionTimeout int,
+	minElectionTimeout time.Duration,
+	maxElectionTimeout time.Duration,
 	handlerImplementation iface.RuleHandler,
 	stateMachineImplementation iface.StateMachine) (*Executor, error) {
 
@@ -81,7 +81,7 @@ func New(
 		return nil, err
 	}
 
-	stat = status.New(nodeAddress, peerAddresses, store)
+	stat = status.New(nodeAddress, peerAddresses, store, minElectionTimeout)
 
 	if log, err = raftlog.New(store); err != nil {
 		return nil, err
@@ -189,10 +189,8 @@ func (executor *Executor) Stop() {
 }
 
 func (executor *Executor) randomElectionTimeout() time.Duration {
-	timeoutInt := executor.minElectionTimeout + rand.Intn(
-		executor.maxElectionTimeout-executor.minElectionTimeout)
-
-	return time.Duration(timeoutInt) * time.Millisecond
+	return executor.minElectionTimeout +
+		time.Duration(rand.Float64()*float64(executor.maxElectionTimeout-executor.minElectionTimeout))
 }
 
 // forwardIncoming forwards `msg` to handler and picks up its response.

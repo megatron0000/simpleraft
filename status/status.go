@@ -5,6 +5,7 @@ import (
 	"simpleraft/iface"
 	"simpleraft/storage"
 	"strconv"
+	"time"
 )
 
 // helper
@@ -32,6 +33,11 @@ type Status struct {
 	// The term of log entry whose index is `clusterChangeIndex`
 	// -1 if none
 	clusterChangeTerm int64
+	// last instant we heard from the leader
+	leaderLastHeard time.Time
+	// least amount of time the raft node is configured
+	// to wait before starting an election
+	minElectionTimeout time.Duration
 	// pointer to data storage
 	storage *storage.Storage
 }
@@ -40,7 +46,7 @@ type Status struct {
 // `peerAddresses` and `nodeAddress` work as default values: they will only be used
 // if there is no alternative record present in the disk storage
 func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
-	storage *storage.Storage) *Status {
+	storage *storage.Storage, minElectionTimeout time.Duration) *Status {
 
 	var (
 		err                     error
@@ -181,6 +187,8 @@ func New(nodeAddress iface.PeerAddress, peerAddresses []iface.PeerAddress,
 		matchIndex:         matchIndex,
 		clusterChangeIndex: clusterChangeIndex,
 		clusterChangeTerm:  clusterChangeTerm,
+		leaderLastHeard:    time.Now().AddDate(-1, 0, 0),
+		minElectionTimeout: minElectionTimeout,
 		storage:            storage,
 	}
 }
@@ -399,4 +407,22 @@ func (status *Status) SetClusterChange(newClusterChangeIndex, newClusterChangeTe
 	}
 
 	status.storage.Commit()
+}
+
+// LeaderLastHeard is the moment in time when we last heard
+// from the leader (initialized to now - 1 month, in which "now"
+// is the moment when the initialization code is executed)
+func (status *Status) LeaderLastHeard() time.Time {
+	return status.leaderLastHeard
+}
+
+// SetLeaderLastHeard does not persist the change (not needed for correctness)
+func (status *Status) SetLeaderLastHeard(instant time.Time) {
+	status.leaderLastHeard = instant
+}
+
+// MinElectionTimeout is the minimum time interval the raft node is configured
+// to wait before starting an election
+func (status *Status) MinElectionTimeout() time.Duration {
+	return status.minElectionTimeout
 }

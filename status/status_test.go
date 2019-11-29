@@ -4,6 +4,7 @@ import (
 	"simpleraft/iface"
 	"simpleraft/storage"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +21,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	peerAddresses := []iface.PeerAddress{"localhost:10001"}
 	newPeerAddresses := []iface.PeerAddress{"localhost:10001", "localhost:10002"}
 
-	status := New(nodeAddress, peerAddresses, storage)
+	status := New(nodeAddress, peerAddresses, storage, 0)
 
 	assert.Equal(t, iface.StateFollower, status.State())
 	assert.Equal(t, nodeAddress, status.NodeAddress())
@@ -32,6 +33,8 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(-1), status.LastApplied())
 	assert.Equal(t, int64(-1), status.ClusterChangeIndex())
 	assert.Equal(t, int64(-1), status.ClusterChangeTerm())
+	assert.True(t, status.LeaderLastHeard().Before(time.Now().AddDate(-1, 0, 0)))
+	assert.Equal(t, time.Duration(0), status.MinElectionTimeout())
 	assert.Equal(t, int64(0), status.NextIndex(peerAddresses[0]))
 	assert.Equal(t, int64(-1), status.MatchIndex(peerAddresses[0]))
 
@@ -45,6 +48,7 @@ func TestRecoverFromDisk(t *testing.T) {
 	status.SetClusterChange(13, 17)
 	status.SetNextIndex(peerAddresses[0], 10)
 	status.SetMatchIndex(peerAddresses[0], 9)
+	status.SetLeaderLastHeard(time.Date(2011, 1, 1, 1, 1, 1, 1, time.Local))
 	status.SetPeerAddresses(newPeerAddresses)
 
 	assert.Equal(t, iface.StateLeader, status.State())
@@ -59,9 +63,13 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(10), status.NextIndex(newPeerAddresses[0]))
 	assert.Equal(t, int64(9), status.MatchIndex(newPeerAddresses[0]))
 	assert.Equal(t, int64(0), status.NextIndex(newPeerAddresses[1]))
+	assert.Equal(t,
+		time.Date(2011, 1, 1, 1, 1, 1, 1, time.Local),
+		status.LeaderLastHeard())
+	assert.Equal(t, time.Duration(0), status.MinElectionTimeout())
 	assert.Equal(t, int64(-1), status.MatchIndex(newPeerAddresses[1]))
 
-	status = New(nodeAddress, peerAddresses, storage)
+	status = New(nodeAddress, peerAddresses, storage, 0)
 
 	assert.Equal(t, iface.StateFollower, status.State())
 	assert.Equal(t, iface.PeerAddress("localhost:10"), status.NodeAddress())
@@ -76,5 +84,6 @@ func TestRecoverFromDisk(t *testing.T) {
 	assert.Equal(t, int64(-1), status.MatchIndex(newPeerAddresses[0]))
 	assert.Equal(t, int64(0), status.NextIndex(newPeerAddresses[1]))
 	assert.Equal(t, int64(-1), status.MatchIndex(newPeerAddresses[1]))
+	status.SetLeaderLastHeard(time.Date(2011, 1, 1, 1, 1, 1, 1, time.Local))
 
 }
