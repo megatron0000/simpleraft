@@ -1,5 +1,7 @@
 package iface
 
+import "time"
+
 var (
 	// StateFollower represents that the raft node is a follower
 	StateFollower string = "follower"
@@ -124,8 +126,17 @@ type Status interface {
 	ClusterChangeIndex() int64
 
 	// ClusterChangeTerm is the term of log entry whose
-	// index is `clusterChangeIndex`. -1 if none
+	// index is `ClusterChangeIndex`. -1 if none
 	ClusterChangeTerm() int64
+
+	// LeaderLastHeard is the moment in time when we last heard
+	// from the leader (initialized to now - 1 month, in which "now"
+	// is the moment when the initialization code is executed)
+	LeaderLastHeard() time.Time
+
+	// MinElectionTimeout is the minimum time interval the raft node is configured
+	// to wait before starting an election
+	MinElectionTimeout() time.Duration
 }
 
 // StateMachine is not part of the raft protocol. Actually,
@@ -353,16 +364,36 @@ type ActionSetLastApplied struct {
 
 // ActionAddServer means the raft node's
 // lists/maps of current peers should be updated
-// to include an additional address
+// to include an additional address. This is safe
+// even if the server in question is already
+// present in the list (no-op in this case).
+// But this should not be issued if the new server
+// address is the raft node itself (lest the 
+// node will have itself as a peer)
 type ActionAddServer struct {
 	NewServerAddress PeerAddress
 }
 
 // ActionRemoveServer means the raft node's
 // lists/maps of current peers should be updated
-// to exclude a specific address
+// to exclude a specific address. This is safe
+// even if the server in question is already
+// absent from the list (no-op in this case)
 type ActionRemoveServer struct {
 	OldServerAddress PeerAddress
+}
+
+// ActionSetPeers is a shortcut to `ActionAddServer`
+// and `ActionRemoveServer`. Instead of issuing
+// various of these, a node can issue a single
+// `ActionSetPeers` to the same effect. In this
+// case, however, the `PeerAddresses` list must
+// be sanitized by the node (i.e. the list
+// must not contain duplicate addresses and also
+// must not contain the address of the node
+// itself)
+type ActionSetPeers struct {
+	PeerAddresses []PeerAddress
 }
 
 // ActionSetNextIndex means the raft node's
@@ -386,6 +417,14 @@ type ActionSetMatchIndex struct {
 type ActionSetClusterChange struct {
 	NewClusterChangeIndex int64
 	NewClusterChangeTerm  int64
+}
+
+// ActionSetLeaderLastHeard means the raft node has just been
+// contacted by the leader (by an append entries), thus we
+// should register the fact that "now" is the last time
+// we heard from the leader
+type ActionSetLeaderLastHeard struct {
+	Instant time.Time
 }
 
 // ActionResetTimer means the raft node's
@@ -483,4 +522,25 @@ type RuleHandler interface {
 	LeaderOnStateMachineProbe(msg MsgStateMachineProbe, log RaftLog, status Status) []interface{}
 	LeaderOnAppendEntriesReply(msg MsgAppendEntriesReply, log RaftLog, status Status) []interface{}
 	LeaderOnRequestVoteReply(msg MsgRequestVoteReply, log RaftLog, status Status) []interface{}
+}
+
+// ClusterChangeCommand is what a (leader) raft node inserts
+// in a log entry when it receives a request to "add server"
+// or "remove server". Effectively, the raft node uses the
+// `Command` field of `LogEntry` struct as if the node was
+// the application layer (since, usually, the application
+// layer is the one who consumes the `Command` field)
+type ClusterChangeCommand struct {
+	// last log entry (before this new one)
+	// which specified a change in cluster configuration
+	OldClusterChangeIndex int64
+	OldClusterChangeTerm  int64
+
+	// all node addresses which belong to the cluster
+	// before this change
+	OldCluster []PeerAddress
+
+	// all node addresses which belong to the cluster
+	// immediately after this change
+	NewCluster []PeerAddress
 }
