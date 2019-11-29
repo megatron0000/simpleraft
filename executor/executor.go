@@ -568,12 +568,12 @@ func (executor *Executor) implementActions(
 			}
 			replyChan <- action.Result
 
-		case iface.ReplyDecidedVote:
+		case iface.ReplyRequestVote:
 			if replyChan == nil {
 				panic("handler tried to issue a Reply* to a local event")
 			}
 			if marshal, err = json.Marshal(action); err != nil {
-				panic("malformed ReplyDecidedVote action")
+				panic("malformed ReplyRequestVote action")
 			}
 			replyChan <- marshal
 
@@ -625,8 +625,17 @@ func (executor *Executor) implementActions(
 
 		case iface.ActionAddServer:
 			addresses := executor.status.PeerAddresses()
+			inTheList := false
+			for _, addr := range addresses {
+				if action.NewServerAddress == addr {
+					inTheList = true
+					break
+				}
+			}
+			if !inTheList {
 			addresses = append(addresses, action.NewServerAddress)
 			executor.status.SetPeerAddresses(addresses)
+			}
 
 		case iface.ActionRemoveServer:
 			oldAddresses := executor.status.PeerAddresses()
@@ -640,6 +649,9 @@ func (executor *Executor) implementActions(
 			}
 			executor.status.SetPeerAddresses(addresses)
 
+		case iface.ActionSetPeers:
+			executor.status.SetPeerAddresses(action.PeerAddresses)
+
 		case iface.ActionSetNextIndex:
 			executor.status.SetNextIndex(action.Peer, action.NewNextIndex)
 
@@ -651,9 +663,12 @@ func (executor *Executor) implementActions(
 				action.NewClusterChangeIndex,
 				action.NewClusterChangeTerm)
 
+		case iface.ActionSetLeaderLastHeard:
+			executor.status.SetLeaderLastHeard(action.Instant)
+
 		case iface.ActionResetTimer:
 			if action.HalfTime {
-				executor.timer.Reset(time.Duration(executor.minElectionTimeout/2) * time.Millisecond)
+				executor.timer.Reset(executor.minElectionTimeout / 2)
 			} else {
 				executor.timer.Reset(executor.randomElectionTimeout())
 			}
