@@ -35,7 +35,7 @@ func (handler *RuleHandler) CandidateOnStateChanged(msg iface.MsgStateChanged, l
 	// request everyone's vote
 	for _, addr := range status.PeerAddresses() {
 		actions = append(actions, iface.ActionRequestVote{
-			Term:             status.CurrentTerm(),
+			Term:             status.CurrentTerm() + 1,
 			CandidateAddress: status.NodeAddress(),
 			LastLogIndex:     lastIndex,
 			LastLogTerm:      lastTerm,
@@ -107,7 +107,7 @@ func (handler *RuleHandler) CandidateOnRequestVote(msg iface.MsgRequestVote, log
 
 	// if candidate is outdated, reject vote
 	if msg.Term < status.CurrentTerm() {
-		actions = append(actions, iface.ReplyDecidedVote{
+		actions = append(actions, iface.ReplyRequestVote{
 			VoteGranted: false,
 			Term:        status.CurrentTerm(),
 			Address:     status.NodeAddress(),
@@ -117,7 +117,7 @@ func (handler *RuleHandler) CandidateOnRequestVote(msg iface.MsgRequestVote, log
 
 	// candidate is exactly as updated as us. Since we
 	// are a candidate, we hve already voted in ourselves, so reject vote
-	actions = append(actions, iface.ReplyDecidedVote{
+	actions = append(actions, iface.ReplyRequestVote{
 		VoteGranted: false,
 		Term:        status.CurrentTerm(),
 		Address:     status.NodeAddress(),

@@ -1,8 +1,10 @@
 package rulehandler
 
 import (
+	"encoding/json"
 	"math"
 	"simpleraft/iface"
+	"time"
 )
 
 // FollowerOnStateChanged implements raft rules
@@ -30,10 +32,12 @@ func (handler *RuleHandler) FollowerOnStateChanged(msg iface.MsgStateChanged, lo
 // FollowerOnAppendEntries implements raft rules
 func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := make([]interface{}, 0) // list of actions created
-
 	// since we are hearing from the leader, reset timeout
 	actions = append(actions, iface.ActionResetTimer{
 		HalfTime: false,
+	})
+	actions = append(actions, iface.ActionSetLeaderLastHeard{
+		Instant: time.Now(),
 	})
 
 	// maybe we are outdated
@@ -88,10 +92,79 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 		actions = append(actions, iface.ActionDeleteLog{
 			Count: log.LastIndex() - msg.PrevLogIndex,
 		})
+
+		// take care ! Maybe we are removing an entry
+		// containing our current cluster configuration.
+		// In this case, revert to previous cluster
+		// configuration
+		containsClusterChange := false
+		stabilized := false
+		clusterChangeIndex := status.ClusterChangeIndex()
+		clusterChangeTerm := status.ClusterChangeTerm()
+		cluster := append(status.PeerAddresses(), status.NodeAddress())
+		for !stabilized {
+			stabilized = true
+			if clusterChangeIndex > msg.PrevLogIndex {
+				stabilized = false
+				containsClusterChange = true
+				entry, _ := log.Get(clusterChangeIndex)
+				record := &iface.ClusterChangeCommand{}
+				json.Unmarshal(entry.Command, &record)
+				clusterChangeIndex = record.OldClusterChangeIndex
+				clusterChangeTerm = record.OldClusterChangeTerm
+				cluster = record.OldCluster
+			}
+		}
+
+		// if deletion detected, rewind to previous configuration
+		if containsClusterChange {
+			actions = append(actions, iface.ActionSetClusterChange{
+				NewClusterChangeIndex: clusterChangeIndex,
+				NewClusterChangeTerm:  clusterChangeTerm,
+			})
+			peers := []iface.PeerAddress{}
+			for _, addr := range cluster {
+				if addr != status.NodeAddress() {
+					peers = append(peers, addr)
+				}
+			}
+			actions = append(actions, iface.ActionSetPeers{
+				PeerAddresses: peers,
+			})
+		}
+
 		// append all entries sent by leader
 		actions = append(actions, iface.ActionAppendLog{
 			Entries: msg.Entries,
 		})
+
+		// once again, take care ! Maybe we are adding some entry
+		// describing a cluster change. In such a case, we must apply
+		// the new cluster configuration to ourselves (specifically,
+		// the last cluster configuration among the new entries)
+		for index := len(msg.Entries) - 1; index >= 0; index-- {
+			if msg.Entries[index].Kind != iface.EntryAddServer &&
+				msg.Entries[index].Kind != iface.EntryRemoveServer {
+				continue
+			}
+			record := &iface.ClusterChangeCommand{}
+			json.Unmarshal(msg.Entries[index].Command, &record)
+			actions = append(actions, iface.ActionSetClusterChange{
+				NewClusterChangeIndex: msg.PrevLogIndex + int64(index+1),
+				NewClusterChangeTerm:  msg.Entries[index].Term,
+			})
+			peers := []iface.PeerAddress{}
+			for _, addr := range record.NewCluster {
+				if addr != status.NodeAddress() {
+					peers = append(peers, addr)
+				}
+			}
+			actions = append(actions, iface.ActionSetPeers{
+				PeerAddresses: peers,
+			})
+			break
+		}
+
 	}
 
 	// if leader has committed more than we know, update our index
@@ -134,7 +207,15 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	// actions = append(actions, iface.ActionResetTimer{HalfTime: false}) // timeout should be reseted
+	// reject if we recently heard from leader
+	// (to avoid "disruptive servers" during cluster configuration change)
+	if time.Now().Sub(status.LeaderLastHeard()) < status.MinElectionTimeout() {
+		actions = append(actions, iface.ReplyRequestVote{
+			VoteGranted: false,
+			Term:        status.CurrentTerm(),
+		})
+		return actions
+	}
 
 	// maybe we are outdated
 	if msg.Term > status.CurrentTerm() {
@@ -145,7 +226,7 @@ func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log 
 
 	// if candidate is still in a previous term, reject vote
 	if msg.Term < status.CurrentTerm() {
-		actions = append(actions, iface.ReplyDecidedVote{
+		actions = append(actions, iface.ReplyRequestVote{
 			VoteGranted: false,
 			Term:        status.CurrentTerm(),
 		})
@@ -154,7 +235,7 @@ func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log 
 
 	// reject vote if we voted on another peer already
 	if status.VotedFor() != "" && status.VotedFor() != msg.CandidateAddress {
-		actions = append(actions, iface.ReplyDecidedVote{
+		actions = append(actions, iface.ReplyRequestVote{
 			VoteGranted: false,
 			Term:        status.CurrentTerm(),
 			Address:     status.NodeAddress(),
@@ -166,7 +247,7 @@ func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log 
 
 	// if we have no log, surely peer is at least as updated as us. so grant vote
 	if lastEntry == nil {
-		actions = append(actions, iface.ReplyDecidedVote{
+		actions = append(actions, iface.ReplyRequestVote{
 			VoteGranted: true,
 			Term:        status.CurrentTerm(),
 			Address:     status.NodeAddress(),
@@ -179,7 +260,7 @@ func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log 
 
 	// ok, we have log. grant vote if peer is as updated as us
 	if msg.LastLogTerm > lastEntry.Term || (msg.LastLogTerm == lastEntry.Term && msg.LastLogIndex >= log.LastIndex()) {
-		actions = append(actions, iface.ReplyDecidedVote{
+		actions = append(actions, iface.ReplyRequestVote{
 			VoteGranted: true,
 			Term:        status.CurrentTerm(),
 			Address:     status.NodeAddress(),
@@ -191,7 +272,7 @@ func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log 
 	}
 
 	// ok, peer is not as updated as us
-	actions = append(actions, iface.ReplyDecidedVote{
+	actions = append(actions, iface.ReplyRequestVote{
 		VoteGranted: false,
 		Term:        status.CurrentTerm(),
 		Address:     status.NodeAddress(),

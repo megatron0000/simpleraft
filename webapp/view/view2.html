@@ -1,7 +1,7 @@
 <div>
   <div ng-controller="ClientController" class="clearfix">
 
-    <div class="col-sm-6">
+    <div class="col-sm-4">
       <h4>Send a command to raft state machine</h4>
       <form class="form-horizontal">
 
@@ -37,7 +37,7 @@
         </div>
 
         <div class="form-group">
-          <label class="col-sm-3 control-label">Send to raft</label>
+          <label class="col-sm-3 control-label">Send</label>
           <div class="col-sm-7">
             <a ng-disabled="waitingResponse || commandInvalid(command) || keyInvalid(key) || valueInvalid(value)"
               class="btn btn-default"
@@ -50,7 +50,7 @@
 
     </div>
 
-    <div class="col-sm-6">
+    <div class="col-sm-4">
       <h4>Check command completion</h4>
       <form class="form-horizontal">
 
@@ -75,10 +75,48 @@
         </div>
 
         <div class="form-group">
-          <label class="col-sm-3 control-label">Send to raft</label>
+          <label class="col-sm-3 control-label">Send</label>
           <div class="col-sm-7">
             <a ng-disabled="waitingResponse || indexInvalid(index) || termInvalid(term)" class="btn btn-default"
               ng-click="!waitingResponse && !indexInvalid(index) && !termInvalid(term) && sendProbe(index, term)">{{waitingResponse ? "..." : "Submit"}}</a>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="col-sm-4">
+      <h4>Request cluster change</h4>
+      <form action="" class="form-horizontal">
+
+        <div class="form-group">
+          <label for="inputType" class="col-sm-3 control-label">Type</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="text" class="form-control" id="inputType" ng-model="type">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="typeInvalid(type)">Must be one of "addserver",
+              "rmserver"</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputAddress" class="col-sm-3 control-label">Address</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input type="text" class="form-control" id="inputAddress" ng-model="address">
+            </div>
+            <span style="font-size:0.8em;color:red;" ng-show="addressInvalid(address)">Must be a valid network
+              address (like
+              "localhost:10001"). Take care not to misspell.</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="col-sm-3 control-label">Send</label>
+          <div class="col-sm-7">
+            <a ng-disabled="waitingResponse || typeInvalid(type) || addressInvalid(address)" class="btn btn-default"
+              ng-click="!waitingResponse && !typeInvalid(type) && !addressInvalid(address) && sendClusterChange(type, address)">{{waitingResponse ? "..." : "Submit"}}</a>
           </div>
         </div>
 

@@ -1,5 +1,18 @@
 (function () {
 
+  function urlInvalid(address) {
+    let url
+    try {
+      url = new URL("http://" + address)
+      if (!url.port) {
+        throw new Error()
+      }
+    } catch {
+      url = null
+    }
+    return url === null
+  }
+
   "use strict";
 
   var App = angular.module("App.controllers", []);
@@ -61,8 +74,6 @@
       $scope.$apply()
     })
 
-    $scope.index = 0
-    $scope.term = 0
 
     $scope.indexInvalid = function (index) {
       return Math.round(index) !== index || index < 0
@@ -80,6 +91,21 @@
       }, 1000);
     }
 
+    $scope.typeInvalid = function (type) {
+      return !type || (type !== 'addserver' && type !== 'rmserver')
+    }
+
+    $scope.addressInvalid = function (address) {
+      return urlInvalid(address)
+    }
+
+    $scope.sendClusterChange = function (type, address) {
+      $scope.waitingResponse = true
+      $scope.response = "......"
+      setTimeout(function () {
+        Socket.emit('new-client-cluster-change', type, address)
+      }, 1000);
+    }
 
   })
 
@@ -89,18 +115,7 @@
     //   $('[data-toggle="switch"]').bootstrapSwitch();
     // }
 
-    function urlInvalid(address) {
-      let url
-      try {
-        url = new URL("http://" + address)
-        if (!url.port) {
-          throw new Error()
-        }
-      } catch {
-        url = null
-      }
-      return url === null
-    }
+
 
     $scope.executorRunning = false
     Socket.emit('get-executor-is-running')

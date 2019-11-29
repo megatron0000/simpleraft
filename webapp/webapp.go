@@ -422,6 +422,51 @@ func (app *RaftWebApp) Start() {
 		s.Emit("ack")
 	})
 
+	server.OnEvent("/", "new-client-cluster-change", func(s socketio.Conn, type_ string, address string) {
+		var (
+			marshal  []byte
+			trans    *transport.Transport
+			endpoint string
+			err      error
+		)
+		s.SetContext("")
+
+		switch type_ {
+		case "addserver":
+			endpoint = "/addServer"
+			req := iface.MsgAddServer{
+				NewServerAddress: iface.PeerAddress(address),
+			}
+			marshal, err = json.Marshal(req)
+		case "rmserver":
+			endpoint = "/removeServer"
+			req := iface.MsgRemoveServer{
+				OldServerAddress: iface.PeerAddress(address),
+			}
+			marshal, err = json.Marshal(req)
+		}
+
+		if err != nil {
+			s.Emit("client-info", "internal error")
+			s.Emit("ack")
+			return
+		}
+
+		trans = transport.New("")
+
+		replyChan := trans.Send(string(app.executor.Status().NodeAddress())+endpoint,
+			marshal)
+		res, ok := <-replyChan
+		if !ok {
+			s.Emit("client-info", "internal error")
+			s.Emit("ack")
+			return
+		}
+		s.Emit("client-info", res)
+		s.Emit("ack")
+
+	})
+
 	server.OnError("/", func(s socketio.Conn, e error) {
 		// fmt.Println("meet error:", e)
 	})

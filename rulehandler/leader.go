@@ -1,7 +1,7 @@
 package rulehandler
 
 import (
-	"fmt"
+	"encoding/json"
 	"math"
 	"simpleraft/iface"
 )
@@ -92,7 +92,7 @@ func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, lo
 		return actions
 	}
 
-	actions = append(actions, iface.ReplyDecidedVote{
+	actions = append(actions, iface.ReplyRequestVote{
 		Address:     status.NodeAddress(),
 		VoteGranted: false,
 		Term:        status.CurrentTerm(),
@@ -104,14 +104,116 @@ func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, lo
 // LeaderOnAddServer implements raft rules
 func (rulehandler *RuleHandler) LeaderOnAddServer(msg iface.MsgAddServer, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
-	// TODO
+
+	if status.CommitIndex() < status.ClusterChangeIndex() {
+		actions = append(actions, iface.ReplyFailed{
+			Reason: "previous change in progress",
+		})
+		return actions
+	}
+
+	entry, _ := log.Get(status.CommitIndex())
+
+	if entry == nil || entry.Term != status.CurrentTerm() {
+		actions = append(actions, iface.ReplyFailed{
+			Reason: "did not commit anything on current term yet",
+		})
+		return actions
+	}
+
+	// put new server in our peer list
+	actions = append(actions, iface.ActionAddServer{
+		NewServerAddress: msg.NewServerAddress,
+	})
+
+	// memorize last time the cluster changed
+	// and last configuration
+	lastClusterRecord, _ := json.Marshal(iface.ClusterChangeCommand{
+		OldClusterChangeIndex: status.ClusterChangeIndex(),
+		OldClusterChangeTerm:  status.ClusterChangeTerm(),
+		OldCluster:            append(status.PeerAddresses(), status.NodeAddress()),
+		NewCluster:            append(status.PeerAddresses(), status.NodeAddress(), msg.NewServerAddress),
+	})
+
+	// append an entry
+	actions = append(actions, iface.ActionAppendLog{
+		Entries: []iface.LogEntry{iface.LogEntry{
+			Kind:    iface.EntryAddServer,
+			Term:    status.CurrentTerm(),
+			Command: lastClusterRecord,
+			Result:  []byte{},
+		}},
+	})
+
+	// inform client
+	actions = append(actions, iface.ReplyCheckLater{
+		Index: log.LastIndex() + 1,
+		Term:  status.CurrentTerm(),
+	})
+
 	return actions
 }
 
 // LeaderOnRemoveServer implements raft rules
 func (rulehandler *RuleHandler) LeaderOnRemoveServer(msg iface.MsgRemoveServer, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
-	// TODO
+
+	if status.CommitIndex() < status.ClusterChangeIndex() {
+		actions = append(actions, iface.ReplyFailed{
+			Reason: "previous change in progress",
+		})
+		return actions
+	}
+
+	entry, _ := log.Get(status.CommitIndex())
+
+	if entry == nil || entry.Term != status.CurrentTerm() {
+		actions = append(actions, iface.ReplyFailed{
+			Reason: "did not commit anything on current term yet",
+		})
+		return actions
+	}
+
+	// remove server from our peer list (if it us ourselves,
+	// it won't be in the peer list, but this operation is safe
+	// nonetheless - it will be a no-op in this case)
+	actions = append(actions, iface.ActionRemoveServer{
+		OldServerAddress: msg.OldServerAddress,
+	})
+
+	oldCluster := append(status.PeerAddresses(), status.NodeAddress())
+	newCluster := []iface.PeerAddress{}
+	for _, addr := range oldCluster {
+		if addr != msg.OldServerAddress {
+			newCluster = append(newCluster, addr)
+		}
+	}
+
+	// memorize last time the cluster changed
+	// and last configuration
+	lastClusterRecord, _ := json.Marshal(iface.ClusterChangeCommand{
+		OldClusterChangeIndex: status.ClusterChangeIndex(),
+		OldClusterChangeTerm:  status.ClusterChangeTerm(),
+		OldCluster:            oldCluster,
+		NewCluster:            newCluster,
+	})
+
+	// append an entry
+	actions = append(actions, iface.ActionAppendLog{
+		Entries: []iface.LogEntry{iface.LogEntry{
+			Kind:    iface.EntryAddServer,
+			Term:    status.CurrentTerm(),
+			Command: lastClusterRecord,
+			Result:  []byte{},
+		}},
+	})
+
+	// inform client
+	actions = append(actions, iface.ReplyCheckLater{
+		Index: log.LastIndex() + 1,
+		Term:  status.CurrentTerm(),
+	})
+
 	return actions
 }
 
@@ -137,9 +239,7 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 			if lastLog != nil {
 				lastTerm = lastLog.Term
 			}
-			fmt.Println("My last index is ", log.LastIndex())
 			for i := status.NextIndex(address); i <= log.LastIndex(); i++ {
-				fmt.Println("Getting index ", i)
 				entry, _ := log.Get(i)
 				entries = append(entries, *entry)
 			}
@@ -205,7 +305,9 @@ func (rulehandler *RuleHandler) LeaderOnStateMachineProbe(msg iface.MsgStateMach
 
 	// Client command not in log
 	if logClientCommand == nil {
-		actions = append(actions, iface.ReplyFailed{})
+		actions = append(actions, iface.ReplyFailed{
+			Reason: "not in log",
+		})
 		return actions
 	}
 
@@ -220,7 +322,9 @@ func (rulehandler *RuleHandler) LeaderOnStateMachineProbe(msg iface.MsgStateMach
 
 	// Client command overwritten
 	if msg.Term != logClientCommand.Term {
-		actions = append(actions, iface.ReplyFailed{})
+		actions = append(actions, iface.ReplyFailed{
+			Reason: "overwritten",
+		})
 		return actions
 	}
 
