@@ -560,7 +560,7 @@ func (executor *Executor) implementActions(
 			if replyChan == nil {
 				panic("handler tried to issue a Reply* to a local event")
 			}
-			replyChan <- []byte("failed")
+			replyChan <- []byte("failed: " + action.Reason)
 
 		case iface.ReplyCompleted:
 			if replyChan == nil {
@@ -633,8 +633,8 @@ func (executor *Executor) implementActions(
 				}
 			}
 			if !inTheList {
-			addresses = append(addresses, action.NewServerAddress)
-			executor.status.SetPeerAddresses(addresses)
+				addresses = append(addresses, action.NewServerAddress)
+				executor.status.SetPeerAddresses(addresses)
 			}
 
 		case iface.ActionRemoveServer:

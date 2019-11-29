@@ -172,7 +172,7 @@ type MsgAppendEntries struct {
 	LeaderCommitIndex int64
 }
 
-// MsgRequestVote means: the caller (i.e. a raft candidadate)
+// MsgRequestVote means: the caller (i.e. a raft candidate)
 // called RequestVote on the current raft node
 type MsgRequestVote struct {
 	Term             int64
@@ -275,6 +275,10 @@ type ReplyCheckLater struct {
 // failure: command requested by client was overwritten in the log
 // by any other entry. Client must reissue the command
 type ReplyFailed struct {
+	// Reason is merely descriptive. Since `ReplyFailed` will
+	// be returned to the client, this field has no a priori
+	// specification
+	Reason string
 }
 
 // ReplyCompleted means: A client requested an action
@@ -292,11 +296,11 @@ type ReplyCompleted struct {
 	Result []byte
 }
 
-// ReplyDecidedVote means: A caller requested the
+// ReplyRequestVote means: A caller requested the
 // current raft node to vote in them; we have decided
 // whether to vote or not; so we must communicate
 // this decision to the caller
-type ReplyDecidedVote struct {
+type ReplyRequestVote struct {
 	// address of the raft node who is sending the reply
 	Address     PeerAddress
 	VoteGranted bool
