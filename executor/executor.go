@@ -135,6 +135,13 @@ func (executor *Executor) Run() {
 
 	executor.stop = make(chan bool)
 
+	executor.appendEntriesReplyChan = make(chan iface.MsgAppendEntriesReply, 1000)
+	executor.requestVoteReplyChan = make(chan iface.MsgRequestVoteReply, 1000)
+	executor.timer = time.NewTimer(time.Millisecond)
+	if !executor.timer.Stop() {
+		<-executor.timer.C
+	}
+
 	var (
 		actions []interface{}
 	)
