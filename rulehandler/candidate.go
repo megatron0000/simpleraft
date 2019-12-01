@@ -66,9 +66,12 @@ func (handler *RuleHandler) CandidateOnAppendEntries(msg iface.MsgAppendEntries,
 	// leader is outdated ?
 	if msg.Term < status.CurrentTerm() {
 		actions = append(actions, iface.ReplyAppendEntries{
-			Address: status.NodeAddress(),
-			Success: false,
-			Term:    status.CurrentTerm(),
+			Address:      status.NodeAddress(),
+			Success:      false,
+			Term:         status.CurrentTerm(),
+			Length:       int64(len(msg.Entries)),
+			PrevLogIndex: msg.PrevLogIndex,
+			PrevLogTerm:  msg.PrevLogTerm,
 		})
 
 		return actions

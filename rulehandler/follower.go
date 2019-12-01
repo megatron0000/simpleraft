@@ -1,6 +1,7 @@
 package rulehandler
 
 import (
+	"math"
 	"simpleraft/iface"
 )
 
@@ -40,9 +41,12 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 	// leader is outdated ?
 	if msg.Term < status.CurrentTerm() {
 		actions = append(actions, iface.ReplyAppendEntries{
-			Address: status.NodeAddress(),
-			Success: false,
-			Term:    status.CurrentTerm(),
+			Address:      status.NodeAddress(),
+			Success:      false,
+			Term:         status.CurrentTerm(),
+			Length:       int64(len(msg.Entries)),
+			PrevLogIndex: msg.PrevLogIndex,
+			PrevLogTerm:  msg.PrevLogTerm,
 		})
 		return actions
 	}
@@ -52,12 +56,89 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 		HalfTime: false,
 	})
 
+	prevEntry, _ := log.Get(msg.PrevLogIndex)
+
+	// I dont have previous log entry (but should)
+	if prevEntry == nil && msg.PrevLogIndex != -1 {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address:      status.NodeAddress(),
+			Success:      false,
+			Term:         status.CurrentTerm(),
+			Length:       int64(len(msg.Entries)),
+			PrevLogIndex: msg.PrevLogIndex,
+			PrevLogTerm:  msg.PrevLogTerm,
+		})
+		return actions
+	}
+
+	// I have previous log entry, but it does not match
+	if prevEntry != nil && prevEntry.Term != msg.PrevLogTerm {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address:      status.NodeAddress(),
+			Success:      false,
+			Term:         status.CurrentTerm(),
+			Length:       int64(len(msg.Entries)),
+			PrevLogIndex: msg.PrevLogIndex,
+			PrevLogTerm:  msg.PrevLogTerm,
+		})
+		return actions
+	}
+
 	// all is ok. accept
 	actions = append(actions, iface.ReplyAppendEntries{
-		Address: status.NodeAddress(),
-		Success: true,
-		Term:    status.CurrentTerm(),
+		Address:      status.NodeAddress(),
+		Success:      true,
+		Term:         status.CurrentTerm(),
+		Length:       int64(len(msg.Entries)),
+		PrevLogIndex: msg.PrevLogIndex,
+		PrevLogTerm:  msg.PrevLogTerm,
 	})
+
+	// if there is anything to append, do it
+	if len(msg.Entries) > 0 {
+		// delete all entries in log after PrevLogIndex
+		actions = append(actions, iface.ActionDeleteLog{
+			Count: log.LastIndex() - msg.PrevLogIndex,
+		})
+
+		// append all entries sent by leader
+		actions = append(actions, iface.ActionAppendLog{
+			Entries: msg.Entries,
+		})
+
+	}
+
+	// if leader has committed more than we know, update our index
+	// and demand state-machine application
+	if msg.LeaderCommitIndex > status.CommitIndex() {
+		actions = append(actions, iface.ActionSetCommitIndex{
+			NewCommitIndex: int64(math.Min(
+				float64(msg.LeaderCommitIndex),
+				float64(msg.PrevLogIndex+int64(len(msg.Entries))),
+			)),
+		})
+		// order the state machine to apply the new committed entries
+		// (only if they are state machine commands)
+		for index := status.CommitIndex() + 1; index < msg.LeaderCommitIndex; index++ {
+			var entry *iface.LogEntry
+
+			// get from my log
+			if index <= msg.PrevLogIndex {
+				entry, _ = log.Get(index)
+
+				// get from leader
+			} else {
+				entry = &msg.Entries[index-msg.PrevLogIndex-1]
+			}
+
+			switch entry.Kind {
+			case iface.EntryStateMachineCommand:
+				actions = append(actions, iface.ActionStateMachineApply{
+					EntryIndex: index,
+				})
+			}
+		}
+	}
 
 	return actions
 }
@@ -100,10 +181,26 @@ func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log 
 		return actions
 	}
 
+	lastEntry, _ := log.Get(log.LastIndex())
+
+	// if we have log but peer's is not as updated as ours, reject
+	if lastEntry != nil && (msg.LastLogTerm < lastEntry.Term || (msg.LastLogTerm == lastEntry.Term && msg.LastLogIndex < log.LastIndex())) {
+		actions = append(actions, iface.ReplyRequestVote{
+			VoteGranted: false,
+			Term:        status.CurrentTerm(),
+			Address:     status.NodeAddress(),
+		})
+		return actions
+	}
+
 	actions = append(actions, iface.ReplyRequestVote{
 		VoteGranted: true,
 		Term:        status.CurrentTerm(),
 		Address:     status.NodeAddress(),
+	})
+
+	actions = append(actions, iface.ActionResetTimer{
+		HalfTime: false,
 	})
 
 	return actions
