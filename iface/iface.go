@@ -331,7 +331,17 @@ type ActionDeleteLog struct {
 }
 
 // ActionSetState means the raft node state
-// should be changed
+// should be changed. 
+// Take care: When the Executor sees this action
+// it will call the OnStateChange rulehandler
+// method even before processing remaining actions
+// that came after this one. Example: If rulehandler
+// returns [ActionSetState(candidate), ReplyNotLeader], then
+// Executor will change node state and call CandidateOnStateChanged,
+// which will return another list of actions (say, [A, B, C]). 
+// Then executor will execute actions A, B, C and only after
+// them it will execute ReplyNotLeader (which came after ActionSetState
+// originally)
 type ActionSetState struct {
 	NewState string
 }
@@ -481,7 +491,8 @@ type ActionRequestVote struct {
 // ActionReprocess means: the current raft node received a message
 // (any of the Msg* structs), processed it, BUT the node
 // wants this message to be redelivered to him (as if it was another
-// message).
+// message). This action should always be the last one among
+// the actions returned by RuleHandler
 type ActionReprocess struct {
 }
 

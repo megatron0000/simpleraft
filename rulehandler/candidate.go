@@ -19,7 +19,7 @@ func (handler *RuleHandler) CandidateOnStateChanged(msg iface.MsgStateChanged, l
 	actions = append(actions, iface.ActionSetVoteCount{
 		NewVoteCount: 1,
 	})
-	// count down. if election is not over by then, we will give up the election
+	// count down. if election is not over by then, we will try another election
 	actions = append(actions, iface.ActionResetTimer{
 		HalfTime: false,
 	})
@@ -48,81 +48,40 @@ func (handler *RuleHandler) CandidateOnStateChanged(msg iface.MsgStateChanged, l
 
 // CandidateOnAppendEntries implements raft rules
 func (handler *RuleHandler) CandidateOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := []interface{}{}
+	actions := []interface{}{} // list of actions to be returned
 
-	// maybe we are outdated
-	if msg.Term > status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetCurrentTerm{
-			NewCurrentTerm: msg.Term,
-		})
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateFollower,
-		})
-		actions = append(actions, iface.ActionReprocess{})
-		return actions
-	}
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE //////////////////////////////
 
-	// leader is outdated ?
-	if msg.Term < status.CurrentTerm() {
-		actions = append(actions, iface.ReplyAppendEntries{
-			Address: status.NodeAddress(),
-			Success: false,
-			Term:    status.CurrentTerm(),
-		})
-		return actions
-	}
-
-	// if peer is at least on same term as us, then he/she is an authentic leader.
-	// step down !
-	if msg.Term >= status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetCurrentTerm{
-			NewCurrentTerm: msg.Term,
-		})
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateFollower,
-		})
-		// we are stepping down, but that is not all ! We should still process the
-		// append entries as a follower
-		actions = append(actions, iface.ActionReprocess{})
-	}
+	actions = append(actions, iface.ReplyAppendEntries{
+		Address: status.NodeAddress(),
+		Success: true,
+		Term:    status.CurrentTerm(),
+	})
 
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
 }
 
 // CandidateOnRequestVote implements raft rules
 func (handler *RuleHandler) CandidateOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := []interface{}{}
+	actions := []interface{}{} // list of actions to be returned
 
-	// maybe we are outdated
-	if msg.Term > status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetCurrentTerm{
-			NewCurrentTerm: msg.Term,
-		})
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateFollower,
-		})
-		actions = append(actions, iface.ActionReprocess{})
-		return actions
-	}
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE //////////////////////////////
 
-	// if candidate is outdated, reject vote
-	if msg.Term < status.CurrentTerm() {
-		actions = append(actions, iface.ReplyRequestVote{
-			VoteGranted: false,
-			Term:        status.CurrentTerm(),
-			Address:     status.NodeAddress(),
-		})
-		return actions
-	}
-
-	// candidate is exactly as updated as us. Since we
-	// are a candidate, we hve already voted in ourselves, so reject vote
 	actions = append(actions, iface.ReplyRequestVote{
 		VoteGranted: false,
 		Term:        status.CurrentTerm(),
 		Address:     status.NodeAddress(),
 	})
+
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
 
 }
 
@@ -140,9 +99,9 @@ func (handler *RuleHandler) CandidateOnRemoveServer(msg iface.MsgRemoveServer, l
 
 // CandidateOnTimeout implements raft rules
 func (handler *RuleHandler) CandidateOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
-	// timed out =( give up on election
+	// timed out =( Try another election !
 	return []interface{}{iface.ActionSetState{
-		NewState: iface.StateFollower,
+		NewState: iface.StateCandidate,
 	}}
 }
 
@@ -166,7 +125,10 @@ func (handler *RuleHandler) CandidateOnAppendEntriesReply(msg iface.MsgAppendEnt
 
 // CandidateOnRequestVoteReply implements raft rules
 func (handler *RuleHandler) CandidateOnRequestVoteReply(msg iface.MsgRequestVoteReply, log iface.RaftLog, status iface.Status) []interface{} {
-	actions := []interface{}{}
+	actions := []interface{}{} // list of actions to be returned
+
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE //////////////////////////////
 
 	// maybe we are outdated. If so, then too bad for us: step down
 	if msg.Term > status.CurrentTerm() {
@@ -179,23 +141,14 @@ func (handler *RuleHandler) CandidateOnRequestVoteReply(msg iface.MsgRequestVote
 		return actions
 	}
 
-	// if peer declined to vote on us, too bad !
-	if !msg.VoteGranted {
-		return actions
-	}
-
 	newVoteCount := status.VoteCount() + 1
 
 	actions = append(actions, iface.ActionSetVoteCount{
 		NewVoteCount: newVoteCount,
 	})
 
-	// reached majority ? Then I AM THE BOSS !!!!
-	if 2*newVoteCount > int64(len(status.PeerAddresses())) {
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateLeader,
-		})
-	}
-
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
 }

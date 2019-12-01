@@ -2,7 +2,6 @@ package rulehandler
 
 import (
 	"encoding/json"
-	"math"
 	"simpleraft/iface"
 )
 
@@ -66,31 +65,27 @@ func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, 
 func (rulehandler *RuleHandler) LeaderOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	// If RPC request or response contains term T > currentTerm:
-	// set currentTerm = T, convert to follower (§5.1)
-	if msg.Term > status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateFollower,
-		})
-		actions = append(actions, iface.ActionReprocess{})
-	}
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE //////////////////////////////
+
+	actions = append(actions, iface.ReplyAppendEntries{
+		Address: status.NodeAddress(),
+		Success: true,
+		Term:    status.CurrentTerm(),
+	})
 
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
 }
 
 // LeaderOnRequestVote implements raft rules
 func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	// If RPC request or response contains term T > currentTerm:
-	// set currentTerm = T, convert to follower (§5.1)
-	if msg.Term > status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateFollower,
-		})
-		actions = append(actions, iface.ActionReprocess{})
-		return actions
-	}
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE //////////////////////////////
 
 	actions = append(actions, iface.ReplyRequestVote{
 		Address:     status.NodeAddress(),
@@ -99,6 +94,10 @@ func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, lo
 	})
 
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
+
 }
 
 // LeaderOnAddServer implements raft rules
@@ -340,88 +339,13 @@ func (rulehandler *RuleHandler) LeaderOnStateMachineProbe(msg iface.MsgStateMach
 func (rulehandler *RuleHandler) LeaderOnAppendEntriesReply(msg iface.MsgAppendEntriesReply, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	// maybe we are outdated... step down !
-	if msg.Term > status.CurrentTerm() {
-		actions = append(actions, iface.ActionSetCurrentTerm{
-			NewCurrentTerm: msg.Term,
-		})
-		actions = append(actions, iface.ActionSetState{
-			NewState: iface.StateFollower,
-		})
-		return actions
-	}
-
-	// If AppendEntries fails because of log inconsistency:
-	// decrement nextIndex and retry (§5.3)
-	if !msg.Success {
-		actions = append(actions, iface.ActionSetNextIndex{
-			Peer:         msg.Address,
-			NewNextIndex: status.NextIndex(msg.Address) - 1,
-		})
-		return actions
-	}
-
-	// If successful: update nextIndex and matchIndex for
-	// follower (§5.3)
-	newNextIndex := log.LastIndex() + 1
-	actions = append(actions, iface.ActionSetNextIndex{
-		Peer:         msg.Address,
-		NewNextIndex: newNextIndex,
-	})
-	newMatchIndex := log.LastIndex()
-	actions = append(actions, iface.ActionSetMatchIndex{
-		Peer:          msg.Address,
-		NewMatchIndex: newMatchIndex,
-	})
-
-	// If there exists an N such that N > commitIndex, a majority
-	// of matchIndex[i] ≥ N, and log[N].term == currentTerm:
-	// set commitIndex = N (§5.3, §5.4).
-	majority := math.Ceil(float64(len(status.PeerAddresses())+1) / 2)
-	newCommitIndex := status.CommitIndex()
-	for N := newCommitIndex + 1; N <= log.LastIndex(); N++ {
-		count := 1 // because there is me myself !
-		for _, address := range status.PeerAddresses() {
-			if address != msg.Address && status.MatchIndex(address) >= N {
-				count++
-			}
-			if address == msg.Address && newMatchIndex >= N {
-				count++
-			}
-		}
-		logEntry, _ := log.Get(N)
-		if logEntry != nil {
-			if float64(count) >= majority && logEntry.Term == status.CurrentTerm() {
-				newCommitIndex = N
-			}
-		}
-	}
-	if newCommitIndex > status.CommitIndex() {
-		actions = append(actions, iface.ActionSetCommitIndex{
-			NewCommitIndex: newCommitIndex,
-		})
-	}
-
-	// If commitIndex > lastApplied: increment lastApplied, apply
-	// log[lastApplied] to state machine (§5.3)
-	// (only if it is a state machine command)
-	for i := status.LastApplied() + 1; i <= newCommitIndex; i++ {
-		actions = append(actions, iface.ActionSetLastApplied{
-			NewLastApplied: i,
-		})
-		entry, _ := log.Get(i)
-		if entry == nil {
-			break
-		}
-		switch entry.Kind {
-		case iface.EntryStateMachineCommand:
-			actions = append(actions, iface.ActionStateMachineApply{
-				EntryIndex: i,
-			})
-		}
-	}
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE //////////////////////////////
 
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
 }
 
 // LeaderOnRequestVoteReply implements raft rules
