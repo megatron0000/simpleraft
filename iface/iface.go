@@ -233,11 +233,21 @@ type MsgStateMachineProbe struct {
 // MsgAppendEntriesReply means: the current raft
 // node sent AppendEntries to another one sometime
 // in the past; now we are receiving the result
+// back from that node
 type MsgAppendEntriesReply struct {
-	// address of the raft node who is sending the reply (us !)
+	// address of the raft node who is sending the reply back to us
 	Address PeerAddress
 	Success bool
 	Term    int64
+	// Length means how many log entries
+	// we had sent to the follower with our AppendEntries message
+	// in the past
+	Length int64
+
+	// Similarly to `Length`, these two are echoes of the
+	// AppendEntries we had sent
+	PrevLogIndex int64
+	PrevLogTerm  int64
 }
 
 // MsgRequestVoteReply means: the current raft
@@ -316,6 +326,16 @@ type ReplyAppendEntries struct {
 	Address PeerAddress
 	Success bool
 	Term    int64
+
+	// Length is the count of how many entries came with
+	// the AppendEntries we are now responding
+	Length int64
+
+	// These two are copies of the fields (with the same
+	// names) that came with the AppendEntries we are now
+	// responding
+	PrevLogIndex int64
+	PrevLogTerm  int64
 }
 
 // ActionAppendLog means some entries should
@@ -331,14 +351,14 @@ type ActionDeleteLog struct {
 }
 
 // ActionSetState means the raft node state
-// should be changed. 
+// should be changed.
 // Take care: When the Executor sees this action
 // it will call the OnStateChange rulehandler
 // method even before processing remaining actions
 // that came after this one. Example: If rulehandler
 // returns [ActionSetState(candidate), ReplyNotLeader], then
 // Executor will change node state and call CandidateOnStateChanged,
-// which will return another list of actions (say, [A, B, C]). 
+// which will return another list of actions (say, [A, B, C]).
 // Then executor will execute actions A, B, C and only after
 // them it will execute ReplyNotLeader (which came after ActionSetState
 // originally)
@@ -382,7 +402,7 @@ type ActionSetLastApplied struct {
 // even if the server in question is already
 // present in the list (no-op in this case).
 // But this should not be issued if the new server
-// address is the raft node itself (lest the 
+// address is the raft node itself (lest the
 // node will have itself as a peer)
 type ActionAddServer struct {
 	NewServerAddress PeerAddress
