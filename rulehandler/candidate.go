@@ -167,6 +167,11 @@ func (handler *RuleHandler) CandidateOnRequestVoteReply(msg iface.MsgRequestVote
 		return actions
 	}
 
+	// only votes for our current term count for election
+	if msg.Term < status.CurrentTerm() {
+		return actions
+	}
+
 	// if peer declined to vote on us, too bad !
 	if !msg.VoteGranted {
 		return actions

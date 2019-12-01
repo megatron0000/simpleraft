@@ -155,6 +155,12 @@ func (rulehandler *RuleHandler) LeaderOnAddServer(msg iface.MsgAddServer, log if
 		}},
 	})
 
+	// record new cluster change index/term
+	actions = append(actions, iface.ActionSetClusterChange{
+		NewClusterChangeIndex: log.LastIndex() + 1,
+		NewClusterChangeTerm:  status.CurrentTerm(),
+	})
+
 	// inform client
 	actions = append(actions, iface.ReplyCheckLater{
 		Index: log.LastIndex() + 1,
@@ -211,11 +217,17 @@ func (rulehandler *RuleHandler) LeaderOnRemoveServer(msg iface.MsgRemoveServer, 
 	// append an entry
 	actions = append(actions, iface.ActionAppendLog{
 		Entries: []iface.LogEntry{iface.LogEntry{
-			Kind:    iface.EntryAddServer,
+			Kind:    iface.EntryRemoveServer,
 			Term:    status.CurrentTerm(),
 			Command: lastClusterRecord,
 			Result:  []byte{},
 		}},
+	})
+
+	// record new cluster change index/term
+	actions = append(actions, iface.ActionSetClusterChange{
+		NewClusterChangeIndex: log.LastIndex() + 1,
+		NewClusterChangeTerm:  status.CurrentTerm(),
 	})
 
 	// inform client
@@ -265,12 +277,19 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 
 			// if not, then just send an empty heartbeat
 		} else {
+
+			lastTerm := int64(-1)
+			entry, _ := log.Get(log.LastIndex())
+			if entry != nil {
+				lastTerm = entry.Term
+			}
+
 			// Heartbeat
 			actions = append(actions, iface.ActionAppendEntries{
 				Destination:       address,
 				Entries:           entries,
 				PrevLogIndex:      log.LastIndex(),
-				PrevLogTerm:       status.CurrentTerm(),
+				PrevLogTerm:       lastTerm,
 				LeaderAddress:     status.NodeAddress(),
 				LeaderCommitIndex: status.CommitIndex(),
 				Term:              status.CurrentTerm(),
