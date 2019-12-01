@@ -646,12 +646,17 @@ func (executor *Executor) implementActions(
 
 		case iface.ActionRemoveServer:
 			oldAddresses := executor.status.PeerAddresses()
-			addresses := make([]iface.PeerAddress, len(oldAddresses)-1)
-			index := 0
-			for _, addr := range oldAddresses {
-				if addr != action.OldServerAddress {
-					addresses[index] = addr
-					index++
+			var addresses []iface.PeerAddress
+			if action.OldServerAddress == executor.status.NodeAddress() {
+				addresses = executor.status.PeerAddresses()
+			} else {
+				addresses := make([]iface.PeerAddress, len(oldAddresses)-1)
+				index := 0
+				for _, addr := range oldAddresses {
+					if addr != action.OldServerAddress {
+						addresses[index] = addr
+						index++
+					}
 				}
 			}
 			executor.status.SetPeerAddresses(addresses)
