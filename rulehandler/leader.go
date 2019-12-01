@@ -9,18 +9,8 @@ import (
 func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	// on becoming leader, insert a bogus log entry just to commit something
-	// belonging to our own term
-	firstEntry := iface.LogEntry{
-		Term:    status.CurrentTerm(),
-		Kind:    iface.EntryNoOp,
-		Command: []byte{},
-		Result:  []byte{},
-	}
-
-	actions = append(actions, iface.ActionAppendLog{
-		Entries: []iface.LogEntry{firstEntry},
-	})
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE (SOMENTE TAREFA 3) ///////////
 
 	for _, address := range status.PeerAddresses() {
 		// for each server, index of the next log entry
@@ -45,11 +35,14 @@ func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, 
 			Destination:       address,
 			Entries:           []iface.LogEntry{},
 			PrevLogIndex:      log.LastIndex(),
-			PrevLogTerm:       firstEntry.Term,
+			PrevLogTerm:       -1,
 			LeaderAddress:     status.NodeAddress(),
 			LeaderCommitIndex: status.CommitIndex(),
 			Term:              status.CurrentTerm(),
 		})
+
+		/////////////// END MOFIFY ///////////////////////////////
+		//////////////////////////////////////////////////////////
 
 	}
 
@@ -220,6 +213,9 @@ func (rulehandler *RuleHandler) LeaderOnRemoveServer(msg iface.MsgRemoveServer, 
 func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
+	//////////////////////////////////////////////////////////
+	/////////////// MODIFY HERE (SOMENTE TAREFA 3) ///////////
+
 	// Reset timer for next timeout
 	actions = append(actions, iface.ActionResetTimer{
 		HalfTime: true,
@@ -229,46 +225,23 @@ func (rulehandler *RuleHandler) LeaderOnTimeout(msg iface.MsgTimeout, log iface.
 	for _, address := range status.PeerAddresses() {
 		entries := []iface.LogEntry{}
 
-		// if we have something to send, them send it !
-		if log.LastIndex() >= status.NextIndex(address) {
-			// If last log index ≥ nextIndex for a follower: send
-			// AppendEntries RPC with log entries starting at nextIndex
-			lastLog, _ := log.Get(status.NextIndex(address) - 1)
-			lastTerm := int64(-1)
-			if lastLog != nil {
-				lastTerm = lastLog.Term
-			}
-			for i := status.NextIndex(address); i <= log.LastIndex(); i++ {
-				entry, _ := log.Get(i)
-				entries = append(entries, *entry)
-			}
-			actions = append(actions, iface.ActionAppendEntries{
-				Destination:       address,
-				Entries:           entries,
-				PrevLogIndex:      status.NextIndex(address) - 1,
-				PrevLogTerm:       lastTerm,
-				LeaderAddress:     status.NodeAddress(),
-				LeaderCommitIndex: status.CommitIndex(),
-				Term:              status.CurrentTerm(),
-			})
-
-			// if not, then just send an empty heartbeat
-		} else {
-			// Heartbeat
-			actions = append(actions, iface.ActionAppendEntries{
-				Destination:       address,
-				Entries:           entries,
-				PrevLogIndex:      log.LastIndex(),
-				PrevLogTerm:       status.CurrentTerm(),
-				LeaderAddress:     status.NodeAddress(),
-				LeaderCommitIndex: status.CommitIndex(),
-				Term:              status.CurrentTerm(),
-			})
-		}
+		// Heartbeat
+		actions = append(actions, iface.ActionAppendEntries{
+			Destination:       address,
+			Entries:           entries,
+			PrevLogIndex:      log.LastIndex(),
+			PrevLogTerm:       status.CurrentTerm(),
+			LeaderAddress:     status.NodeAddress(),
+			LeaderCommitIndex: status.CommitIndex(),
+			Term:              status.CurrentTerm(),
+		})
 
 	}
 
 	return actions
+
+	/////////////// END OF MODIFY ////////////////////////////
+	//////////////////////////////////////////////////////////
 }
 
 // LeaderOnStateMachineCommand implements raft rules
