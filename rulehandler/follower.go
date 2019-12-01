@@ -30,9 +30,29 @@ func (handler *RuleHandler) FollowerOnStateChanged(msg iface.MsgStateChanged, lo
 func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{} // list of actions to be returned
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
+	// maybe we are outdated
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+	}
 
+	// leader is outdated ?
+	if msg.Term < status.CurrentTerm() {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address: status.NodeAddress(),
+			Success: false,
+			Term:    status.CurrentTerm(),
+		})
+		return actions
+	}
+
+	// since we are hearing from the leader, reset timeout
+	actions = append(actions, iface.ActionResetTimer{
+		HalfTime: false,
+	})
+
+	// all is ok. accept
 	actions = append(actions, iface.ReplyAppendEntries{
 		Address: status.NodeAddress(),
 		Success: true,
@@ -40,28 +60,53 @@ func (handler *RuleHandler) FollowerOnAppendEntries(msg iface.MsgAppendEntries, 
 	})
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
 }
 
 // FollowerOnRequestVote implements raft rules
 func (handler *RuleHandler) FollowerOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{} // list of actions to be returned
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
+	// maybe we are outdated
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+
+		actions = append(actions, iface.ActionSetVotedFor{
+			NewVotedFor: "",
+		})
+
+		actions = append(actions, iface.ActionReprocess{})
+
+		return actions
+	}
+
+	// if candidate is still in a previous term, reject vote
+	if msg.Term < status.CurrentTerm() {
+		actions = append(actions, iface.ReplyRequestVote{
+			VoteGranted: false,
+			Term:        status.CurrentTerm(),
+		})
+		return actions
+	}
+
+	// reject vote if we voted on another peer already
+	if status.VotedFor() != "" && status.VotedFor() != msg.CandidateAddress {
+		actions = append(actions, iface.ReplyRequestVote{
+			VoteGranted: false,
+			Term:        status.CurrentTerm(),
+			Address:     status.NodeAddress(),
+		})
+		return actions
+	}
 
 	actions = append(actions, iface.ReplyRequestVote{
-		VoteGranted: false,
+		VoteGranted: true,
 		Term:        status.CurrentTerm(),
 		Address:     status.NodeAddress(),
 	})
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
 }
 
 // FollowerOnAddServer implements raft rules

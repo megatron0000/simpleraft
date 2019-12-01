@@ -50,27 +50,56 @@ func (handler *RuleHandler) CandidateOnStateChanged(msg iface.MsgStateChanged, l
 func (handler *RuleHandler) CandidateOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{} // list of actions to be returned
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
+	// maybe we are outdated
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetState{
+			NewState: iface.StateFollower,
+		})
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+		actions = append(actions, iface.ActionReprocess{})
 
-	actions = append(actions, iface.ReplyAppendEntries{
-		Address: status.NodeAddress(),
-		Success: true,
-		Term:    status.CurrentTerm(),
+		return actions
+	}
+
+	// leader is outdated ?
+	if msg.Term < status.CurrentTerm() {
+		actions = append(actions, iface.ReplyAppendEntries{
+			Address: status.NodeAddress(),
+			Success: false,
+			Term:    status.CurrentTerm(),
+		})
+
+		return actions
+	}
+
+	actions = append(actions, iface.ActionSetState{
+		NewState: iface.StateFollower,
 	})
+	// we are stepping down, but that is not all ! We should still process the
+	// append entries as a follower
+	actions = append(actions, iface.ActionReprocess{})
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
 }
 
 // CandidateOnRequestVote implements raft rules
 func (handler *RuleHandler) CandidateOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{} // list of actions to be returned
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
+	// maybe we are outdated
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+		actions = append(actions, iface.ActionSetState{
+			NewState: iface.StateFollower,
+		})
+		actions = append(actions, iface.ActionReprocess{})
+
+		return actions
+	}
 
 	actions = append(actions, iface.ReplyRequestVote{
 		VoteGranted: false,
@@ -79,10 +108,6 @@ func (handler *RuleHandler) CandidateOnRequestVote(msg iface.MsgRequestVote, log
 	})
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
-
 }
 
 // CandidateOnAddServer implements raft rules
@@ -127,9 +152,6 @@ func (handler *RuleHandler) CandidateOnAppendEntriesReply(msg iface.MsgAppendEnt
 func (handler *RuleHandler) CandidateOnRequestVoteReply(msg iface.MsgRequestVoteReply, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{} // list of actions to be returned
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
-
 	// maybe we are outdated. If so, then too bad for us: step down
 	if msg.Term > status.CurrentTerm() {
 		actions = append(actions, iface.ActionSetCurrentTerm{
@@ -138,6 +160,12 @@ func (handler *RuleHandler) CandidateOnRequestVoteReply(msg iface.MsgRequestVote
 		actions = append(actions, iface.ActionSetState{
 			NewState: iface.StateFollower,
 		})
+
+		return actions
+	}
+
+	// if peer declined to vote on us, too bad !
+	if !msg.VoteGranted {
 		return actions
 	}
 
@@ -147,8 +175,12 @@ func (handler *RuleHandler) CandidateOnRequestVoteReply(msg iface.MsgRequestVote
 		NewVoteCount: newVoteCount,
 	})
 
-	return actions
+	// reached majority ? Then I AM THE BOSS !!!!
+	if 2*newVoteCount > int64(len(status.PeerAddresses())) {
+		actions = append(actions, iface.ActionSetState{
+			NewState: iface.StateLeader,
+		})
+	}
 
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
+	return actions
 }

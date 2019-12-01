@@ -58,27 +58,35 @@ func (rulehandler *RuleHandler) LeaderOnStateChanged(msg iface.MsgStateChanged, 
 func (rulehandler *RuleHandler) LeaderOnAppendEntries(msg iface.MsgAppendEntries, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
-
-	actions = append(actions, iface.ReplyAppendEntries{
-		Address: status.NodeAddress(),
-		Success: true,
-		Term:    status.CurrentTerm(),
-	})
+	// If RPC request or response contains term T > currentTerm:
+	// set currentTerm = T, convert to follower (§5.1)
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetState{
+			NewState: iface.StateFollower,
+		})
+		actions = append(actions, iface.ActionReprocess{})
+	}
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
 }
 
 // LeaderOnRequestVote implements raft rules
 func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
+	// If RPC request or response contains term T > currentTerm:
+	// set currentTerm = T, convert to follower (§5.1)
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+		actions = append(actions, iface.ActionSetState{
+			NewState: iface.StateFollower,
+		})
+		actions = append(actions, iface.ActionReprocess{})
+
+		return actions
+	}
 
 	actions = append(actions, iface.ReplyRequestVote{
 		Address:     status.NodeAddress(),
@@ -87,10 +95,6 @@ func (rulehandler *RuleHandler) LeaderOnRequestVote(msg iface.MsgRequestVote, lo
 	})
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
-
 }
 
 // LeaderOnAddServer implements raft rules
@@ -312,13 +316,19 @@ func (rulehandler *RuleHandler) LeaderOnStateMachineProbe(msg iface.MsgStateMach
 func (rulehandler *RuleHandler) LeaderOnAppendEntriesReply(msg iface.MsgAppendEntriesReply, log iface.RaftLog, status iface.Status) []interface{} {
 	actions := []interface{}{}
 
-	//////////////////////////////////////////////////////////
-	/////////////// MODIFY HERE //////////////////////////////
+	// maybe we are outdated... step down !
+	if msg.Term > status.CurrentTerm() {
+		actions = append(actions, iface.ActionSetCurrentTerm{
+			NewCurrentTerm: msg.Term,
+		})
+		actions = append(actions, iface.ActionSetState{
+			NewState: iface.StateFollower,
+		})
+
+		return actions
+	}
 
 	return actions
-
-	/////////////// END OF MODIFY ////////////////////////////
-	//////////////////////////////////////////////////////////
 }
 
 // LeaderOnRequestVoteReply implements raft rules
