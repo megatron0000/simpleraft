@@ -650,7 +650,7 @@ func (executor *Executor) implementActions(
 			if action.OldServerAddress == executor.status.NodeAddress() {
 				addresses = executor.status.PeerAddresses()
 			} else {
-				addresses := make([]iface.PeerAddress, len(oldAddresses)-1)
+				addresses = make([]iface.PeerAddress, len(oldAddresses)-1)
 				index := 0
 				for _, addr := range oldAddresses {
 					if addr != action.OldServerAddress {
