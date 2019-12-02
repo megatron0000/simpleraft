@@ -230,6 +230,26 @@ func (rulehandler *RuleHandler) LeaderOnRemoveServer(msg iface.MsgRemoveServer, 
 		NewClusterChangeTerm:  status.CurrentTerm(),
 	})
 
+	// send a last heartbeat to to-be-removed server
+	// to minimize the chance it will be disruptive
+
+	lastTerm := int64(-1)
+	lastEntry, _ := log.Get(log.LastIndex())
+	if lastEntry != nil {
+		lastTerm = lastEntry.Term
+	}
+
+	// Heartbeat
+	actions = append(actions, iface.ActionAppendEntries{
+		Destination:       msg.OldServerAddress,
+		Entries:           []iface.LogEntry{},
+		PrevLogIndex:      log.LastIndex(),
+		PrevLogTerm:       lastTerm,
+		LeaderAddress:     status.NodeAddress(),
+		LeaderCommitIndex: status.CommitIndex(),
+		Term:              status.CurrentTerm(),
+	})
+
 	// inform client
 	actions = append(actions, iface.ReplyCheckLater{
 		Index: log.LastIndex() + 1,
